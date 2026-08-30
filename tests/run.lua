@@ -24,6 +24,7 @@ dofile(plug_root .. "/tests/project_spec.lua")
 dofile(plug_root .. "/tests/quickfix_spec.lua")
 dofile(plug_root .. "/tests/terminal_spec.lua")
 dofile(plug_root .. "/tests/history_spec.lua")
+dofile(plug_root .. "/tests/state_spec.lua")
 dofile(plug_root .. "/tests/e2e_spec.lua")
 
 T.summary()

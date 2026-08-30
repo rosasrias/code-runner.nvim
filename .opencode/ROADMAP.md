@@ -8,7 +8,8 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] Auditar arquitectura actual (sesión `.opencode/`, inspección completa)
 - [x] Crear contexto persistente `.opencode/` (README/ROADMAP/ARCHITECTURE/CHANGELOG/TODO)
 - [x] Crear `AGENTS.md`
-- [ ] Estado central de ejecución (`idle|running|success|failed|cancelled`) + `state()` API
+- [x] Estado central de ejecución (`idle|running|success|failed|cancelled`) + `state()` API
+- [x] Fix invocado por el estado: terminal reutilizada sin E95 / job anterior en marcha se cancela
 - [ ] `:CodeRunStop` — cancelar el proceso activo del plugin (nunca procesos ajenos)
 - [ ] `:CodeRunRestart` — detener y re-ejecutar la última acción
 - [~] Run Last robusto — hoy vive en `last_choice` (memoria); respaldar con historial persistente/persistencia de última acción

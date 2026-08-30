@@ -193,8 +193,14 @@ function M._apply_window_label(buf, parts)
 end
 
 -- Cierra la ventana que muestra `buf` y libera el buffer del plugin.
+-- Si el job seguía corriendo, el cierre por el usuario se registra como
+-- cancelado (la terminal se borra y con ella muere el job).
 -- Expuesto como M._close_current para tests.
 function M._close_current(buf)
+  if require("code-runner.state").get().status == "running" then
+    require("code-runner.state").set "cancelled"
+  end
+
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
       pcall(vim.api.nvim_win_close, win, true)
@@ -254,7 +260,17 @@ function M._exit_hint(buf, code, qf_count)
 end
 
 -- Estado al salir del proceso: quickfix + closure según la configuración.
-function M._on_exit(buf, code, cwd)
+-- Solo registra success/failed si el job sigue siendo el actual (run_id):
+-- un on_exit asíncrono de un job reemplazado, o un cierre por el usuario
+-- (cancelado), no pueden pisar el estado del job que corre ahora.
+function M._on_exit(buf, code, cwd, run_id)
+  local state = require "code-runner.state"
+  local s = state.get()
+
+  if s.status == "running" and (run_id or s.run_id) == s.run_id then
+    state.set(code == 0 and "success" or "failed", { code = code, cwd = cwd })
+  end
+
   local qf_count = require("code-runner.quickfix").handle(buf, code, cwd)
 
   local cfg = config.options.terminal
@@ -275,17 +291,46 @@ function M.open(cmd, direction, cwd, label)
   direction = direction or config.options.terminal.direction
   local command = shell.wrap_command(cmd)
 
+  -- Key resuelta del archivo del usuario ANTES de cambiar la ventana actual
+  -- (después, la ventana activa pasa a ser la terminal y %:e ya no vale).
+  local entry_key = require("code-runner.context")._resolve_key()
+
   local term_win = get_last_terminal_window()
+  local state = require "code-runner.state"
+  local buf
 
   if term_win then
     vim.api.nvim_set_current_win(term_win)
+    local candidate = vim.api.nvim_win_get_buf(term_win)
+
+    if state.get().status == "running" then
+      -- El job del plugin sigue en marcha: cancelarlo y reabrir desde cero
+      -- (evitar reutilizar un buffer jobado igual equivale a stop implícito).
+      state.set "cancelled"
+      pcall(vim.api.nvim_buf_delete, candidate, { force = true })
+    else
+      -- Job terminado: reusamos el buffer (termopen reinicia ahí el nuevo
+      -- comando). Sin esto, crear otro buffer con el mismo nombre lanza E95.
+      buf = candidate
+    end
   else
     M._open_window(direction)
   end
 
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.api.nvim_buf_set_name(buf, M.BUF_NAME)
-  vim.api.nvim_win_set_buf(0, buf)
+  if not buf then
+    -- Purga buffers huérfanos de code-runner (sin ventana): su job ya no
+    -- corre o es nuestro y hay que reabrir. Dejarlos provoca E95 al crear
+    -- otro buffer con el mismo nombre.
+    for _, b in ipairs(vim.api.nvim_list_bufs()) do
+      if b ~= vim.api.nvim_get_current_buf() and vim.api.nvim_buf_get_name(b):find(M.BUF_NAME, 1, true) then
+        pcall(vim.api.nvim_buf_delete, b, { force = true })
+      end
+    end
+
+    buf = vim.api.nvim_create_buf(false, true)
+    vim.api.nvim_buf_set_name(buf, M.BUF_NAME)
+    vim.api.nvim_win_set_buf(0, buf)
+  end
 
   label = label or ""
   vim.b[buf].code_runner_label = label
@@ -297,11 +342,29 @@ function M.open(cmd, direction, cwd, label)
     opts.cwd = cwd
   end
 
+  -- Estado central antes de lanzar: registra el job nuevo y su run_id. Los
+  -- on_exit de jobs anteriores (run_id viejo) no podrán pisar este estado.
+  state.set("running", {
+    action = label ~= "" and label or nil,
+    cwd = cwd,
+    filetype = entry_key,
+  })
+  local rid = state.get().run_id
+
   opts.on_exit = function(_, code)
-    M._on_exit(buf, code, cwd)
+    M._on_exit(buf, code, cwd, rid)
   end
 
-  vim.fn.termopen(command, opts)
+  -- termopen exige un buffer sin modificar: al reusar el buffer de la
+  -- terminal, el job anterior dejó `modified` en al revisar.
+  pcall(vim.api.nvim_buf_set_option, buf, "modified", false)
+
+  if vim.fn.termopen(command, opts) == -1 then
+    state.set("failed", { code = -1 })
+    M.notify("No se pudo lanzar el comando: " .. command, vim.log.levels.ERROR)
+    return
+  end
+
   vim.cmd "startinsert"
 end
 

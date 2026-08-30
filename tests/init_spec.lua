@@ -64,10 +64,12 @@ end)
 
 T.section("init: API pública")
 
-T.it("expone build_run, run_last y run_history", function()
+T.it("expone la API pública: build_run, run_last, run_history y state", function()
   T.truthy(type(cr.build_run) == "function")
   T.truthy(type(cr.run_last) == "function")
   T.truthy(type(cr.run_history) == "function")
+  T.truthy(type(cr.state) == "function")
+  T.truthy(cr.state().status, "retorna el estado central (copiado)")
 end)
 
 T.it("run_last sin ejecución previa notifica WARN", function()

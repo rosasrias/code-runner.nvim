@@ -193,4 +193,11 @@ end
 M._build_entry = build_entry
 M._project_cwd = project_cwd
 
+-- Estado de la ejecución actual/última del plugin (copia inmutable):
+-- { status = "idle|running|success|failed|cancelled", action, cwd,
+--   filetype, code, started_at, ended_at }
+function M.state()
+	return require("code-runner.state").get()
+end
+
 return M

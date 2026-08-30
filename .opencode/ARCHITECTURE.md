@@ -8,7 +8,7 @@ real (mantener la simplicidad es un valor del proyecto).
 
 ```
 lua/code-runner/
-├── init.lua       Orquestación del flujo de usuario (setup, picker, repeat)
+├── init.lua       Orquestación del flujo de usuario (setup, picker, repeat, state)
 ├── config.lua     Defaults + opts; única fuente de opciones
 ├── actions.lua    Catálogo de acciones por extensión/filetype + overrides
 ├── context.lua    Detección: test bajo el cursor + entry point (TS con fallback regex)
@@ -16,6 +16,7 @@ lua/code-runner/
 ├── terminal.lua   Ventanas (h/v/float), título/winbar, estado, q, autoclose
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
+├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
 └── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
@@ -75,6 +76,22 @@ persistente). `:CodeRunHistory` → picker sobre `history.list()` → re-ejecuta
 `[ERROR] path:[line]`, MSVC `path(line,col)`, `path:line:col:`, `path:line:`,
 `--- FAIL:`, `File "path", line N` (Python). `handle` devuelve count de
 entradas; en éxito con `close_on_success` cierra y vacía, con warnings refresca.
+
+## Estado central (state.lua)
+
+`terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
+job; `_on_exit` registra `success`/`failed` con el exit code si el job sigue
+siendo el actual; `_close_current` (tecla `q`) registra `cancelled` si corría.
+
+**run_id**: cada ejecución incrementa una generación; el `on_exit` captura su
+propio `run_id` y solo transiciona si sigue siendo el del estado. Así, un
+on_exit asíncrono de un job viejo (reemplazado o cancelado) jamás pisa el
+estado del que corre ahora.
+
+**Reuso de terminal**: la ventana del plugin se reutiliza; `termopen` reinicia
+el job en el mismo buffer (antes: se creaba otro buffer con el mismo nombre →
+E95). Si el job anterior seguía corriendo, se cancela (`cancelled`) y se abre
+desde cero. La key/filetype se resuelve ANTES de cambiar la ventana actual.
 
 ## Picker
 

@@ -4,12 +4,12 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 
 ## P0 — ahora
 
-- [ ] **Estado central de ejecución**: módulo `state.lua` (o tabla en init) con
-      `idle|running|success|failed|cancelled` + `state()` API. Alimentado por
-      `terminal.open`/`_on_exit`; pestaña de acciones de Java/scripts también.
-- [ ] **`:CodeRunStop`**: `terminal.open` debe exponer el job id de `termopen`
-      y un `stop()` que maté solo ese job (enviar señal al job del plugin, no
-      matar otros). Command en `plugin/code-runner.lua`.
+- [x] **Estado central de ejecución**: módulo `state.lua` (`idle|running|success|
+      failed|cancelled`) + `state()` API. Alimentado por `terminal.open`/`_on_exit`;
+      `run_id` evita que on_exit de jobs viejos pisen el estado actual. Incluye
+      fix E95 (reuso de buffer terminal) y `cancelled` al cerrar con `q`.
+- [ ] **`:CodeRunStop`**: usar el buffer/job actual (último `run_id`) y matarlo
+      via `buf_delete` forzado (`_close_current` ya lo hace; exponer el job id).
 - [ ] **`:CodeRunRestart`**: combinar stop + re-ejecutar última acción.
 - [ ] **Run Last robusto**: persistir última acción (JSON en
       `stdpath("data")/code-runner/` junto a history, o usar el tope del

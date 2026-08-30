@@ -42,7 +42,8 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 
 | Módulo | Responsabilidad |
 | --- | --- |
-| `init.lua` | Orquestación: `setup`, `build_run` (picker), `run_last`, `run_history` |
+| `init.lua` | Orquestación: `setup`, `build_run` (picker), `run_last`, `run_history`, `state` |
+| `state.lua` | Estado central (`idle|running|success|failed|cancelled`) + `run_id` anti-carreras |
 | `config.lua` | Defaults + merge de `opts` |
 | `actions.lua` | Catálogo de acciones por lenguaje (tabla estática + overrides de usuario) |
 | `context.lua` | Detección de test bajo el cursor y entry point (main) vía TS/regex |
