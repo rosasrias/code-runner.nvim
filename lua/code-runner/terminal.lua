@@ -4,8 +4,31 @@ local shell = require "code-runner.shell"
 local M = {}
 M.BUF_NAME = "code-runner"
 
-function M.notify(msg, level)
-  vim.notify(msg, level or vim.log.levels.INFO, { title = "code-runner.nvim" })
+function M.notify(msg, level, title)
+  level = level or vim.log.levels.INFO
+
+  -- Si hay un proveedor de notificaciones propio (nvim-notify u otro),
+  -- respetarlo: él ya sabe colorear por nivel.
+  local info = debug.getinfo(vim.notify, "S")
+  local src = info and (info.short_src or "") or ""
+  local default_provider = src:find("_core[/\\]editor%.lua", 1) ~= nil
+    or src:find("_defaults%.lua", 1) ~= nil
+
+  if not default_provider then
+    vim.notify(msg, level, { title = title or "code-runner.nvim" })
+    return
+  end
+
+  -- El notify del core solo colorea WARN/ERROR (INFO sale blanco).
+  -- Coloreamos nosotros con grupos estándar que existen en cualquier tema.
+  local hl = "Question" -- verde: éxito/aviso
+  if level == vim.log.levels.ERROR then
+    hl = "ErrorMsg"
+  elseif level == vim.log.levels.WARN then
+    hl = "WarningMsg"
+  end
+
+  vim.api.nvim_echo({ { msg, hl } }, true, {})
 end
 
 local function get_main_window()
@@ -99,21 +122,75 @@ function M._maybe_autoclose(buf, code)
   return true
 end
 
+-- Color de la acción según su icono (repite la lógica del picker)
+local function label_hl(label)
+  local icons = config.options.icons
+
+  if icons.run ~= "" and label:find(icons.run, 1, true) then
+    return config.options.picker.hl_run
+  end
+
+  if icons.build ~= "" and label:find(icons.build, 1, true) then
+    return config.options.picker.hl_build
+  end
+
+  return config.options.picker.hl_misc
+end
+
+-- Segmentos [texto, hl] del título: base + la acción elegida coloreada.
+-- Expuesto como M._label_parts para tests.
+function M._label_parts(label)
+  local p = config.options.picker
+  local t = config.options.terminal
+
+  local parts = { { t.title, t.hl_title or p.hl_misc } }
+
+  if label and label ~= "" then
+    parts[#parts + 1] = " · "
+    parts[#parts + 1] = { label, label_hl(label) }
+  end
+
+  return parts
+end
+
 -- Pone el texto de la ventana de la terminal: title del float o winbar en
--- los splits. Expuesto como M._apply_window_label para tests.
-function M._apply_window_label(buf, text)
+-- los splits. Acepta un string (plano) o una lista de segmentos:
+-- { texto } | { texto, hl }. Expuesto como M._apply_window_label.
+function M._apply_window_label(buf, parts)
+  local segments = type(parts) == "table" and parts or { { parts, nil } }
+
   for _, win in ipairs(vim.api.nvim_list_wins()) do
-    if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
-      goto continue
-    end
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+      if vim.api.nvim_win_get_config(win).relative ~= "" then
+        local float_title = {}
 
-    if vim.api.nvim_win_get_config(win).relative ~= "" then
-      vim.api.nvim_win_set_config(win, { title = text })
-    else
-      vim.wo[win].winbar = " " .. text
-    end
+        for _, s in ipairs(segments) do
+          if type(s) == "string" then
+            float_title[#float_title + 1] = { s }
+          elseif s[2] and s[2] ~= "" then
+            float_title[#float_title + 1] = { s[1], s[2] }
+          else
+            float_title[#float_title + 1] = { s[1] }
+          end
+        end
 
-    ::continue::
+        vim.api.nvim_win_set_config(win, { title = float_title })
+      else
+        local winbar_parts = {}
+
+        for _, s in ipairs(segments) do
+          if type(s) == "string" then
+            winbar_parts[#winbar_parts + 1] = s
+          elseif s[2] and s[2] ~= "" then
+            winbar_parts[#winbar_parts + 1] = ("%%#%s#%s%%*"):format(s[2], s[1])
+          else
+            winbar_parts[#winbar_parts + 1] = s[1]
+          end
+        end
+
+        vim.wo[win].winbar = " " .. table.concat(winbar_parts)
+      end
+    end
   end
 end
 
@@ -140,6 +217,7 @@ function M._exit_hint(buf, code)
   end
 
   local ok = code == 0
+  local t = config.options.terminal
 
   if not ok then
     M.notify(
@@ -157,9 +235,15 @@ function M._exit_hint(buf, code)
     M._close_current(buf)
   end, { buffer = buf, nowait = true, desc = "Cerrar terminal de code-runner" })
 
-  local base = vim.b[buf].code_runner_title or config.options.terminal.title
-  local suffix = ok and " · ✓ terminó OK · q cierra" or (" · ✗ error %d · q cierra"):format(code)
-  M._apply_window_label(buf, base .. suffix)
+  local parts = M._label_parts(vim.b[buf].code_runner_label)
+
+  if ok then
+    parts[#parts + 1] = { " · ✓ terminó OK · q cierra", t.hl_status_ok }
+  else
+    parts[#parts + 1] = { (" · ✗ error %d · q cierra"):format(code), t.hl_status_err }
+  end
+
+  M._apply_window_label(buf, parts)
 end
 
 -- Estado al salir del proceso: quickfix + closure según la configuración.
@@ -196,12 +280,9 @@ function M.open(cmd, direction, cwd, label)
   vim.api.nvim_buf_set_name(buf, M.BUF_NAME)
   vim.api.nvim_win_set_buf(0, buf)
 
-  local title = config.options.terminal.title
-  if label and label ~= "" then
-    title = title .. " · " .. label
-  end
-  vim.b[buf].code_runner_title = title
-  M._apply_window_label(buf, title)
+  label = label or ""
+  vim.b[buf].code_runner_label = label
+  M._apply_window_label(buf, M._label_parts(label))
 
   local opts = {}
 

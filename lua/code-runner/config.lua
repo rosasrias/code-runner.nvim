@@ -21,8 +21,13 @@ M.defaults = {
       height = 0.6,
     },
     -- Título de la ventana de la terminal (winbar en splits, título en float).
-    -- Se le concatena la acción elegida (Run/Build).
+    -- Se le concatena la acción elegida (Run/Build) coloreada según su icono.
     title = "⚡ CodeRunner · Terminal",
+    -- Colores del título: base, estado OK y estado con error.
+    -- Los grupos Ex* vienen del tema "ecotic" (ojo si cambiás de tema).
+    hl_title = "ExBlue",
+    hl_status_ok = "ExGreen",
+    hl_status_err = "ExYellow",
     -- Cerrar la terminal al terminar con éxito (exit code 0).
     -- Con false (default) la terminal se queda abierta, muestra la salida y
     -- cierra con "q"; con true se cierra sola cuando el proceso termina OK.

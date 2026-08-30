@@ -42,6 +42,9 @@ T.section("terminal: defaults y public API")
 T.it("los defaults mantienen la terminal abierta con título propio", function()
   T.eq(false, config.options.terminal.autoclose)
   T.truthy(config.options.terminal.title)
+  T.truthy(config.options.terminal.hl_title)
+  T.truthy(config.options.terminal.hl_status_ok)
+  T.truthy(config.options.terminal.hl_status_err)
   T.truthy(config.options.terminal.float.width)
   T.truthy(config.options.terminal.float.height)
 end)
@@ -171,6 +174,55 @@ T.it("los splits muestran la terminal en su winbar", function()
   T.truthy(wb:find("Terminal", 1, true), "winbar contiene el título")
 
   clean_windows()
+end)
+
+T.it("el winbar aplica highlight por segmento (nada de blanco monótono)", function()
+  clean_windows()
+  vim.cmd "only"
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.cmd "split"
+  vim.api.nvim_win_set_buf(0, buf)
+
+  terminal._apply_window_label(buf, { { "Título", "ExGreen" }, " · texto", { "q cierra", "ExYellow" } })
+
+  local wb = vim.wo[0].winbar or ""
+  T.truthy(wb:find("%#ExGreen#Título%*", 1, true), "segmento 1 con su highlight")
+  T.truthy(wb:find(" · texto", 1, true), "texto plano intermedio")
+  T.truthy(wb:find("%#ExYellow#q cierra%*", 1, true), "segmento 2 con su highlight")
+
+  clean_windows()
+end)
+
+T.it("el float recibe segmentos con color", function()
+  vim.cmd "only"
+  local buf = vim.api.nvim_create_buf(false, true)
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = 30,
+    height = 8,
+    row = 1,
+    col = 2,
+    style = "minimal",
+    border = "rounded",
+  })
+
+  terminal._apply_window_label(buf, { { "Terminal", "ExGreen" }, " · q cierra" })
+
+  local flat = vim.inspect(vim.api.nvim_win_get_config(win).title) or ""
+  T.truthy(flat:find("ExGreen", 1, true), "el segmento conserva su color")
+  T.truthy(flat:find("q cierra", 1, true), "el texto está presente")
+
+  clean_windows()
+end)
+
+T.it("_label_parts colorea la acción según su icono", function()
+  local icons = config.options.icons
+  local parts = terminal._label_parts(icons.run .. " Run")
+
+  T.eq(config.options.terminal.title, parts[1][1])
+  T.eq(config.options.terminal.hl_title, parts[1][2])
+  T.eq(icons.run .. " Run", parts[3][1])
+  T.eq(config.options.picker.hl_run, parts[3][2], "action run con hl_run")
 end)
 
 T.section("terminal: al terminar se mantiene abierta con ayuda")
