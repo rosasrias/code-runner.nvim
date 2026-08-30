@@ -27,9 +27,12 @@ local function execute_action(action, vars, cwd, key)
 		if not ok then
 			terminal.notify(err, vim.log.levels.ERROR)
 		end
-	else
-		terminal.open(shell.substitute(action, vars, key), nil, cwd)
+		return
 	end
+
+	local cmd = shell.substitute(action, vars, key)
+	terminal.open(cmd, nil, cwd)
+	require("code-runner.history").add(cmd, cwd, key)
 end
 
 -- Directorio de trabajo para ejecutar: raíz del proyecto si se detecta
@@ -146,6 +149,43 @@ function M.run_last()
 	end
 
 	execute_action(action, nil, last_choice.cwd, last_choice.lang)
+end
+
+-- Selector del historial: re-ejecuta una entrada guardada
+function M.run_history()
+	local terminal = require("code-runner.terminal")
+	local picker = require("code-runner.picker")
+
+	local history = require("code-runner.history")
+	local items = history.list()
+
+	if #items == 0 then
+		terminal.notify("El historial está vacío", vim.log.levels.WARN)
+		return
+	end
+
+	picker.select(items, {
+		prompt = config.options.picker.title,
+		title = "Historial",
+		format_item = function(it)
+			local cwd = it.cwd ~= "" and ("  (en " .. it.cwd .. ")") or ""
+			return ("%dx %s%s"):format(it.count or 1, it.cmd, cwd)
+		end,
+	}, function(choice)
+		if not choice then
+			return
+		end
+
+		last_choice = {
+			lang = choice.key,
+			choice = nil,
+			test = nil,
+			cmd = choice.cmd,
+			cwd = choice.cwd,
+		}
+
+		execute_action(choice.cmd, nil, choice.cwd, choice.key)
+	end)
 end
 
 -- Expuesto para tests

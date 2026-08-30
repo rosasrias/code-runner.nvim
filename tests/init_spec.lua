@@ -64,9 +64,10 @@ end)
 
 T.section("init: API pública")
 
-T.it("expone build_run y run_last", function()
+T.it("expone build_run, run_last y run_history", function()
   T.truthy(type(cr.build_run) == "function")
   T.truthy(type(cr.run_last) == "function")
+  T.truthy(type(cr.run_history) == "function")
 end)
 
 T.it("run_last sin ejecución previa notifica WARN", function()
@@ -90,11 +91,12 @@ end)
 
 T.section("plugin: comandos de usuario")
 
-T.it("registra :CodeRun y :CodeRunLast", function()
+T.it("registra :CodeRun, :CodeRunLast y :CodeRunHistory", function()
   dofile(PLUG_ROOT .. "/plugin/code-runner.lua")
   local cmds = vim.api.nvim_get_commands {}
   T.truthy(cmds.CodeRun, ":CodeRun registrado")
   T.truthy(cmds.CodeRunLast, ":CodeRunLast registrado")
+  T.truthy(cmds.CodeRunHistory, ":CodeRunHistory registrado")
 end)
 
 T.it("el guard evita doble registro", function()

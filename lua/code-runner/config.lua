@@ -52,6 +52,13 @@ M.defaults = {
     open = true,
     height = 8,
   },
+  history = {
+    -- Historial de ejecuciones (persistente, en stdpath("data")). El
+    -- selector :CodeRunHistory permite re-ejecutar y ver qué corre más.
+    enabled = true,
+    -- Número máximo de entradas guardadas
+    max = 50,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

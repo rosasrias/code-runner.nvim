@@ -16,7 +16,16 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - **Ejecuta desde la raíz del proyecto**: sube buscando marcadores (`go.mod`, `pom.xml`, `package.json`, `.git`, ...) y lanza el comando en ese directorio (`go test`, `pytest`, `mvn test`, ...). Fallback: directorio del archivo
 - **Terminal con autoclose**: ventana horizontal/vertical o **flotante** (`direction = "float"`); se cierra sola al terminar con éxito (`autoclose`, configurable) y si falla se queda abierta con el quickfix listo. Reutiliza solo las terminales del plugin (buffer propio `code-runner`) y nunca deja la sesión sin ventanas
 - **Quickfix con errores**: al terminar un build/test parsea la salida (gcc/clang/rustc/go `file:line:col`, Maven `[ERROR]`, MSVC `file(line,col)`, `--- FAIL:`) y llena la lista quickfix para saltar al error con `:cn` / `:cp`. Se abre automáticamente si el comando falla
+- **Historial persistente**: cada ejecución se guarda (con su `cwd` y lenguaje) en `stdpath("data")`. `:CodeRunHistory` lo abre en el picker para re-ejecutar cualquier entrada; las repetidas suben sin duplicarse y muestran cuántas veces corrieron
 - Variables de contexto: `$testName` (test bajo el cursor), `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto) en cualquier comando
+
+## Comandos
+
+| Comando | Descripción |
+| --- | --- |
+| `:CodeRun` | Selecciona build/run en el picker |
+| `:CodeRunLast` | Repite la última ejecución |
+| `:CodeRunHistory` | Re-ejecuta desde el historial |
 
 ## Instalación
 
@@ -69,6 +78,12 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     --   open = true,
     --   height = 8,
     -- },
+    -- history: historial persistente de ejecuciones (:CodeRunHistory).
+    -- enabled=false lo desactiva; max limita las entradas:
+    -- history = {
+    --   enabled = true,
+    --   max = 50,
+    -- },
   },
   keys = {
     { "<C-b>", "<cmd>CodeRun<cr>", desc = "Ejecutar código" },
@@ -88,13 +103,13 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (104 tests). Corre con:
+Suite propia sin dependencias externas (116 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
 ```
 
-Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, flotante y autoclose al éxito) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
+Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, flotante y autoclose al éxito), historial persistente (dedupe, límites, archivos corruptos, integración con `:CodeRun`/`:CodeRunHistory`) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
 
 Exit code `1` si algo falla, apto para CI.
 
