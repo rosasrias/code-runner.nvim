@@ -66,6 +66,10 @@ M.defaults = {
     -- Abrir la ventana quickfix cuando el comando falla con errores
     open = true,
     height = 8,
+    -- Cerrar la ventana y vaciar la lista cuando la ejecución termina bien
+    -- (los errores ya se corrigieron). Con warnings parseables se refresca
+    -- la lista y la ventana queda abierta.
+    close_on_success = true,
   },
   history = {
     -- Historial de ejecuciones (persistente, en stdpath("data")). El

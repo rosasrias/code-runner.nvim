@@ -100,6 +100,49 @@ T.it("handle devuelve 0 cuando no se parsea nada", function()
   vim.api.nvim_buf_delete(buf, { force = true })
 end)
 
+local function qf_windows()
+  local wins = {}
+
+  for _, w in ipairs(vim.api.nvim_list_wins()) do
+    if vim.fn.win_gettype(w) == "quickfix" then
+      table.insert(wins, w)
+    end
+  end
+
+  return wins
+end
+
+T.it("éxito sin salidas: cierra la ventana quickfix y vacía la lista", function()
+  -- una lista vieja con errores de un build anterior
+  vim.fn.setqflist({ { filename = "a.c", lnum = 1, text = "viejo error" } }, "r")
+  pcall(vim.cmd, "silent copen")
+
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Compilation finished", "OK" })
+
+  local count = quickfix.handle(buf, 0, vim.fn.getcwd())
+  T.eq(0, count)
+  T.eq(0, #qf_windows(), "la ventana quickfix se cerró")
+  T.eq(0, #vim.fn.getqflist(), "la lista quedó vacía")
+
+  vim.api.nvim_buf_delete(buf, { force = true })
+  pcall(vim.cmd, "silent cclose")
+end)
+
+T.it("éxito con warnings: refresca la lista sin abrir ventana forzada", function()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "src/a.c:3:1: warning: unused variable" })
+
+  vim.fn.setqflist({ { filename = "a.c", lnum = 1, text = "viejo" } }, "r")
+
+  local count = quickfix.handle(buf, 0, CWD)
+  T.eq(0, count)
+  T.eq(1, #vim.fn.getqflist(), "la lista se actualizó con el warning")
+  T.eq(3, vim.fn.getqflist()[1].lnum)
+
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
 T.it("sin coincidencias -> lista vacía", function()
   local entries = quickfix.parse({ "hello world", "", "Success! built in 2s" }, CWD)
   T.eq(0, #entries)

@@ -94,6 +94,20 @@ function M.handle(buf, code, cwd)
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local entries = M.parse(lines, cwd)
   local count = #entries
+  local cfg = config.options.quickfix
+
+  -- Éxito: los errores ya se corrigieron, la lista anterior es basura.
+  if code == 0 then
+    if count == 0 and cfg.close_on_success then
+      pcall(vim.cmd, "silent cclose")
+      vim.fn.setqflist({}, "r")
+    elseif count > 0 then
+      -- El éxito con warnings: refresca la lista pero no fuerza a abrir.
+      vim.fn.setqflist(entries, "r")
+    end
+
+    return 0
+  end
 
   if count == 0 then
     return 0
@@ -101,9 +115,7 @@ function M.handle(buf, code, cwd)
 
   vim.fn.setqflist(entries, "r")
 
-  local cfg = config.options.quickfix
-
-  if cfg.open and code ~= 0 then
+  if cfg.open then
     pcall(vim.cmd, "silent copen " .. cfg.height)
     vim.cmd "wincmd p"
   end

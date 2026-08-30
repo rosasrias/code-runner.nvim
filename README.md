@@ -78,11 +78,13 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     --   max_depth = 30,
     -- },
     -- quickfix: errores de build/test a la lista quickfix (:cn/:cp).
-    -- open=true abre la ventana solo cuando el comando falla con errores:
+    -- open=true abre la ventana solo cuando el comando falla con errores;
+    -- close_on_success cierra esa ventana y vacía la lista al re-ejecutar bien:
     -- quickfix = {
     --   enabled = true,
     --   open = true,
     --   height = 8,
+    --   close_on_success = true,
     -- },
     -- history: historial persistente de ejecuciones (:CodeRunHistory).
     -- enabled=false lo desactiva; max limita las entradas:
@@ -135,7 +137,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (134 tests). Corre con:
+Suite propia sin dependencias externas (136 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
