@@ -2,6 +2,13 @@ local config = require "code-runner.config"
 
 local M = {}
 
+-- Texto visible de un item: los items pueden ser tablas (ej: historial) y
+-- solo se muestran a través de opts.format_item.
+-- Expuesto como M._display para tests.
+local function display(item, format_item)
+  return format_item and format_item(item) or item
+end
+
 local function fallback(items, opts, on_choice)
   vim.ui.select(items, {
     prompt = opts.prompt,
@@ -30,7 +37,7 @@ local function volt_pick(items, opts, on_choice, volt)
   local content_w = api.nvim_strwidth(opts.prompt or "")
 
   for _, item in ipairs(items) do
-    content_w = math.max(content_w, api.nvim_strwidth(item))
+    content_w = math.max(content_w, api.nvim_strwidth(display(item, opts.format_item)))
   end
 
   local width = math.min(content_w + 12, vim.o.columns - 4)
@@ -78,12 +85,12 @@ local function volt_pick(items, opts, on_choice, volt)
 
         for i, item in ipairs(items) do
           local sel = i == selected
-          local label = (sel and "▸ " or "  ") .. (opts.format_item and opts.format_item(item) or item)
+          local label = (sel and "▸ " or "  ") .. display(item, opts.format_item)
 
           table.insert(lines, {
             {
               padded(label, inner_w),
-              sel and hl_sel or item_hl(item),
+              sel and hl_sel or item_hl(label),
               {
                 click = function()
                   if not closed then
@@ -233,5 +240,8 @@ function M.select(items, opts, on_choice)
 
   volt_pick(items, opts, on_choice, volt)
 end
+
+-- Expuesto para tests
+M._display = display
 
 return M

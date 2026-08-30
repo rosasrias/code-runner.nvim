@@ -65,6 +65,29 @@ T.it("lista vacía llama on_choice(nil) sin abrir nada", function()
   T.truthy(got_nil)
 end)
 
+T.section("picker: items no-string (historial)")
+
+T.it("_display formatea items tabela con format_item", function()
+  local out = picker._display({ cmd = "go test ./..." }, function(it)
+    return it.cmd .. "  (en C:/p)"
+  end)
+
+  T.eq("go test ./...  (en C:/p)", out)
+end)
+
+T.it("_display pasa strings sin format_item intactas", function()
+  T.eq("hola", picker._display("hola", nil))
+end)
+
+T.it("el ancho del picker no se rompe con items en tabla (nvim_strwidth)", function()
+  -- reproduce el bug: nvim_strwidth(item) con item = tabla
+  local display = picker._display({ cmd = "pytest -q" }, function(it)
+    return it.cmd
+  end)
+
+  T.truthy(vim.api.nvim_strwidth(display) >= #"pytest -q")
+end)
+
 T.section("picker: ventana volt")
 
 local has_volt = vim.fn.isdirectory(vim.fn.stdpath "data" .. "/lazy/volt") == 1
@@ -90,6 +113,33 @@ if has_volt then
     T.truthy(found_title, "debe existir una ventana con el título contextual")
 
     -- limpieza: cerrar floats de volt
+    for _, win in ipairs(vim.api.nvim_list_wins()) do
+      local buf = vim.api.nvim_win_get_buf(win)
+      if vim.bo[buf].filetype == "VoltWindow" then
+        pcall(vim.api.nvim_win_close, win, true)
+      end
+    end
+    vim.schedule(function() end)
+    vim.wait(50)
+  end)
+
+  T.it("acepta items en tabla (historial) con format_item", function()
+    config.setup { ui = "volt" }
+
+    -- reproducción del bug: el cálculo de ancho llamaba nvim_strwidth(item)
+    -- con item = tabla y solo el render usaba format_item
+    picker.select({
+      { cmd = "pytest -q", cwd = "C:/p" },
+      { cmd = "go test ./...", cwd = "C:/proj" },
+    }, {
+      format_item = function(it)
+        return it.cmd .. "  (en " .. it.cwd .. ")"
+      end,
+    }, function() end)
+
+    -- si llegó aquí sin error, el picker calculó ancho y colores con el label
+    T.truthy(true)
+
     for _, win in ipairs(vim.api.nvim_list_wins()) do
       local buf = vim.api.nvim_win_get_buf(win)
       if vim.bo[buf].filetype == "VoltWindow" then
