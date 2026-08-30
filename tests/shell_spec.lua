@@ -146,16 +146,15 @@ local function with_absolute_buffer(callback)
   end
 end
 
-T.it("$binRun relativo lleva prefijo (.\\ o ./) según plataforma", function()
+T.it("$binRun relativo lleva el prefijo del ejecutable según plataforma", function()
   with_relative_buffer(function()
     local base = vim.fn.expand "%:r"
-    local suffix = shell.EXE_SUFFIX
 
     shell.IS_WIN = true
-    T.eq('& "' .. shell.BIN_PREFIX .. base .. suffix .. '"', shell.substitute("$binRun"), "windows")
+    T.eq('& "' .. shell.BIN_PREFIX .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "windows")
 
     shell.IS_WIN = false
-    T.eq('"' .. shell.BIN_PREFIX .. base .. suffix .. '"', shell.substitute("$binRun"), "unix")
+    T.eq('"' .. shell.BIN_PREFIX .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "unix")
 
     shell.IS_WIN = IS_WIN_BACKUP
   end)

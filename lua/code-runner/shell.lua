@@ -2,8 +2,24 @@
 local M = {}
 
 M.IS_WIN = vim.fn.has "win32" == 1
-M.EXE_SUFFIX = M.IS_WIN and ".exe" or ""
-M.BIN_PREFIX = M.IS_WIN and ".\\" or "./"
+
+-- EXE_SUFFIX / BIN_PREFIX responden al IS_WIN actual (los tests lo someten a
+-- prueba con valores simulados), no al valor de carga del módulo.
+local PLATFORM = {
+  [true] = { suffix = ".exe", prefix = ".\\" },
+  [false] = { suffix = "", prefix = "./" },
+}
+
+setmetatable(M, {
+  __index = function(_, key)
+    if key == "EXE_SUFFIX" then
+      return PLATFORM[M.IS_WIN].suffix
+    elseif key == "BIN_PREFIX" then
+      return PLATFORM[M.IS_WIN].prefix
+    end
+    return nil
+  end,
+})
 
 -- PowerShell evalúa rutas entre comillas como strings (las imprime);
 -- necesita el operador & para ejecutarlas. Bash no.
