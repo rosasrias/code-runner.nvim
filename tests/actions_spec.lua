@@ -10,6 +10,8 @@ T.it("todos los lenguajes esperados están registrados", function()
     "py", "js", "ts", "php", "rb", "sh", "zsh", "lua", "ps1", "bat",
     "r", "R", "jl", "pl", "dart", "ex", "exs", "hs", "ml", "nim",
     "cr", "v", "scala", "clj", "erl", "fsx", "md", "make", "html", "tex",
+    "deno", "bun", "d", "adb", "pas", "cu", "scm", "rkt", "lisp", "clojure",
+    "groovy", "coffee", "fish", "raku", "tcl", "vbs", "kts", "odin", "gd", "vala",
   }
   for _, lang in ipairs(expected) do
     T.truthy(catalog[lang], "falta el lenguaje '" .. lang .. "'")
@@ -41,6 +43,53 @@ T.it("las etiquetas incluyen los iconos de contexto", function()
   local catalog = actions.get_actions()
   T.truthy(catalog.go.__order[1]:find(icons.run, 1, true), "acción run con icono")
   T.truthy(catalog.c.__order[#catalog.c.__order]:find(icons.build, 1, true), "acción build con icono")
+end)
+
+T.it("los lenguajes recientes llevan la herramienta correcta en su plantilla", function()
+  local catalog = actions.get_actions()
+  local checks = {
+    deno = "deno run",
+    bun = "bun",
+    d = "rdmd",
+    adb = "gnatmake",
+    pas = "fpc",
+    cu = "nvcc",
+    scm = "guile",
+    rkt = "racket",
+    lisp = "sbcl",
+    clojure = "clojure",
+    groovy = "groovy",
+    coffee = "coffee",
+    fish = "fish",
+    raku = "raku",
+    tcl = "tclsh",
+    vbs = "cscript",
+    kts = "kotlinc -script",
+    odin = "odin run",
+    gd = "godot",
+    vala = "vala",
+  }
+
+  for lang, needle in pairs(checks) do
+    local cmds = {}
+
+    for _, label in ipairs(catalog[lang].__order) do
+      local action = catalog[lang][label]
+      if type(action) == "string" then
+        table.insert(cmds, action)
+      end
+    end
+
+    local found = false
+
+    for _, c in ipairs(cmds) do
+      if c:find(needle, 1, true) then
+        found = true
+      end
+    end
+
+    T.truthy(found, lang .. ": plantilla con '" .. needle .. "'")
+  end
 end)
 
 T.it("el usuario puede añadir acciones sin perder las default", function()

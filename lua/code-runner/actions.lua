@@ -462,6 +462,99 @@ function M.get_actions()
         open_runner(string.format('latexmk -c "%s"', texfile))
       end,
     },
+
+    -----------------------------------------------------
+    -- Runtimes JS modernos
+    -----------------------------------------------------
+    deno = {
+      [RUN .. " Run"] = 'deno run "%"',
+    },
+
+    bun = {
+      [RUN .. " Run"] = 'bun "%"',
+    },
+
+    -----------------------------------------------------
+    -- D / Ada / Pascal / Cuda
+    -----------------------------------------------------
+    d = {
+      [RUN .. " Run"] = 'rdmd "%"',
+    },
+
+    adb = native "gnatmake",
+
+    pas = {
+      [BUILD .. " Compile"] = 'fpc "%" -o"$fileBase' .. shell.EXE_SUFFIX .. '"',
+      [RUN .. " Run"] = "$binRun",
+      [RUN .. BUILD .. " Compile & Run"] = 'fpc "%" -o"$fileBase' .. shell.EXE_SUFFIX .. '" && $binRun',
+    },
+
+    cu = native "nvcc",
+
+    -----------------------------------------------------
+    -- Lisps y similares
+    -----------------------------------------------------
+    scm = {
+      [RUN .. " Run"] = 'guile "%"',
+    },
+
+    rkt = {
+      [RUN .. " Run"] = 'racket "%"',
+    },
+
+    lisp = {
+      [RUN .. " Run"] = 'sbcl --script "%"',
+    },
+
+    clojure = {
+      [RUN .. " Run"] = 'clojure "%"',
+    },
+
+    -----------------------------------------------------
+    -- Scripts adicionales
+    -----------------------------------------------------
+    groovy = {
+      [RUN .. " Run"] = 'groovy "%"',
+    },
+
+    coffee = {
+      [RUN .. " Run"] = 'coffee "%"',
+    },
+
+    fish = {
+      [RUN .. " Run"] = 'fish "%"',
+    },
+
+    raku = {
+      [RUN .. " Run"] = 'raku "%"',
+    },
+
+    tcl = {
+      [RUN .. " Run"] = 'tclsh "%"',
+    },
+
+    vbs = {
+      [RUN .. " Run"] = 'cscript //nologo "%"',
+    },
+
+    -----------------------------------------------------
+    -- Kotlin script / Odin / Godot / Vala
+    -----------------------------------------------------
+    kts = {
+      [RUN .. " Run"] = 'kotlinc -script "%"',
+    },
+
+    odin = {
+      [RUN .. " Run"] = 'odin run "%"',
+    },
+
+    gd = {
+      [RUN .. " Run"] = 'godot --headless --script "%"',
+    },
+
+    vala = {
+      [RUN .. " Run"] = 'vala "%"',
+    },
   }
 
   -- Extensiones del usuario (sobrescriben o añaden)
