@@ -52,13 +52,18 @@ end
 
 -- % y tokens $var en una sola pasada; los desconocidos se dejan intactos.
 -- vars permite inyectar valores por token (ej: { ["$testName"] = "TestFoo" }).
-function M.substitute(cmd, vars)
+-- key (opcional) se usa para resolver $project con los marcadores del lenguaje.
+function M.substitute(cmd, vars, key)
   vars = vars or {}
 
   local out = cmd:gsub("%%l", tostring(vim.api.nvim_win_get_cursor(0)[1]))
   out = out:gsub("%%", SUBSTITUTIONS["$file"]())
 
   return (out:gsub("%$%w+", function(token)
+    if token == "$project" then
+      return require("code-runner.project").resolve(key)
+    end
+
     local expand_fn = SUBSTITUTIONS[token]
 
     if expand_fn then

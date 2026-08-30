@@ -13,7 +13,8 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - Comandos con múltiples `&&` soportados en PowerShell y bash
 - Rutas con espacios seguras; binarios `.exe` correctos en Windows
 - **Contexto inteligente**: si el cursor está dentro de un test, la primera acción del picker es `Run test` con su comando por lenguaje (Go, Python, JS/TS, Lua, Rust, Java, PHP, Ruby). Detecta el test bajo el cursor (treesitter con fallback por línea) y el entry point (`main` / `__main__`) para mostrar `· main:NN` en el título
-- Variables de contexto: `$testName` (test bajo el cursor), `$stem` (nombre sin extensión) y `%l` (línea del cursor) en cualquier comando
+- **Ejecuta desde la raíz del proyecto**: sube buscando marcadores (`go.mod`, `pom.xml`, `package.json`, `.git`, ...) y lanza el comando en ese directorio (`go test`, `pytest`, `mvn test`, ...). Fallback: directorio del archivo
+- Variables de contexto: `$testName` (test bajo el cursor), `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto) en cualquier comando
 
 ## Instalación
 
@@ -46,6 +47,13 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     --     py  = false,                                   -- desactiva Python
     --   },
     -- },
+    -- project: ejecutar desde la raíz del proyecto.
+    -- markers añade marcadores extra; max_depth limita la subida:
+    -- project = {
+    --   enabled = true,
+    --   markers = { ".nx", "pyrightconfig.json" },
+    --   max_depth = 30,
+    -- },
   },
   keys = {
     { "<C-b>", "<cmd>CodeRun<cr>", desc = "Ejecutar código" },
@@ -65,13 +73,13 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (74 tests). Corre con:
+Suite propia sin dependencias externas (84 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
 ```
 
-Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, y E2E que **compilan y ejecutan código real** (C, Java, Python) validando la salida. Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
+Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`) y E2E que **compilan y ejecutan código real** (C, Java, Python) validando la salida. Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
 
 Exit code `1` si algo falla, apto para CI.
 

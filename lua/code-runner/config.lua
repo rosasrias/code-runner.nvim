@@ -28,6 +28,15 @@ M.defaults = {
     -- ej: { go = "gotestsum -- -run \"^$testName$\"", py = false }
     test = {},
   },
+  project = {
+    -- Ejecutar desde la raíz del proyecto (sube buscando go.mod, pom.xml,
+    -- package.json, .git, ...). Fallback: directorio del archivo.
+    enabled = true,
+    -- Marcadores extra (además de los por lenguaje y .git/.hg/.svn)
+    markers = {},
+    -- Límite de directorios a subir antes de rendirse
+    max_depth = 30,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

@@ -18,7 +18,7 @@ local function autosave()
 	end
 end
 
-local function execute_action(action, vars)
+local function execute_action(action, vars, cwd, key)
 	local shell = require("code-runner.shell")
 	local terminal = require("code-runner.terminal")
 
@@ -28,8 +28,17 @@ local function execute_action(action, vars)
 			terminal.notify(err, vim.log.levels.ERROR)
 		end
 	else
-		terminal.open(shell.substitute(action, vars))
+		terminal.open(shell.substitute(action, vars, key), nil, cwd)
 	end
+end
+
+-- Directorio de trabajo para ejecutar: raíz del proyecto si se detecta
+local function project_cwd(key)
+	if not config.options.project.enabled then
+		return nil
+	end
+
+	return require("code-runner.project").resolve(key)
 end
 
 local function build_entry(actions, terminal)
@@ -76,6 +85,7 @@ function M.build_run()
 
 	local cctx = context.detect(key)
 	local test_item = context.decorate(entry, key, cctx)
+	local cwd = project_cwd(key)
 
 	-- Título contextual: "⚡ CodeRunner · App.java" (+ · main:nn si hay entry)
 	local fname = vim.fn.expand("%:t")
@@ -103,9 +113,10 @@ function M.build_run()
 			choice = choice,
 			test = test_item and cctx.test.name,
 			cmd = test_item and choice == test_item.label and test_item.cmd or nil,
+			cwd = cwd,
 		}
 
-		execute_action(entry[choice], { ["$testName"] = last_choice.test })
+		execute_action(entry[choice], { ["$testName"] = last_choice.test }, cwd, key)
 	end)
 end
 
@@ -122,7 +133,7 @@ function M.run_last()
 
 	-- Repetición fiel de un "Run test": el comando quedó guardado con su contexto
 	if last_choice.cmd then
-		execute_action(last_choice.cmd, { ["$testName"] = last_choice.test })
+		execute_action(last_choice.cmd, { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang)
 		return
 	end
 
@@ -134,10 +145,11 @@ function M.run_last()
 		return
 	end
 
-	execute_action(action)
+	execute_action(action, nil, last_choice.cwd, last_choice.lang)
 end
 
 -- Expuesto para tests
 M._build_entry = build_entry
+M._project_cwd = project_cwd
 
 return M

@@ -43,8 +43,9 @@ local function get_last_terminal_window()
   return terms[#terms].win
 end
 
--- Abre (o reutiliza) una terminal con el comando ya envuelto para el shell
-function M.open(cmd, direction)
+-- Abre (o reutiliza) una terminal con el comando ya envuelto para el shell.
+-- cwd (opcional): directorio en el que arranca el job (raíz del proyecto).
+function M.open(cmd, direction, cwd)
   direction = direction or config.options.terminal.direction
   local command = shell.wrap_command(cmd)
 
@@ -66,7 +67,13 @@ function M.open(cmd, direction)
 
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_win_set_buf(0, buf)
-  vim.fn.termopen(command)
+  local opts = {}
+
+  if cwd and cwd ~= "" then
+    opts.cwd = cwd
+  end
+
+  vim.fn.termopen(command, opts)
   vim.cmd "startinsert"
 end
 
