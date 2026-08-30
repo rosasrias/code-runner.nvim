@@ -14,6 +14,7 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - Rutas con espacios seguras; binarios `.exe` correctos en Windows
 - **Contexto inteligente**: si el cursor está dentro de un test, la primera acción del picker es `Run test` con su comando por lenguaje (Go, Python, JS/TS, Lua, Rust, Java, PHP, Ruby). Detecta el test bajo el cursor (treesitter con fallback por línea) y el entry point (`main` / `__main__`) para mostrar `· main:NN` en el título
 - **Ejecuta desde la raíz del proyecto**: sube buscando marcadores (`go.mod`, `pom.xml`, `package.json`, `.git`, ...) y lanza el comando en ese directorio (`go test`, `pytest`, `mvn test`, ...). Fallback: directorio del archivo
+- **Terminal con autoclose**: ventana horizontal/vertical o **flotante** (`direction = "float"`); se cierra sola al terminar con éxito (`autoclose`, configurable) y si falla se queda abierta con el quickfix listo. Reutiliza solo las terminales del plugin (buffer propio `code-runner`) y nunca deja la sesión sin ventanas
 - **Quickfix con errores**: al terminar un build/test parsea la salida (gcc/clang/rustc/go `file:line:col`, Maven `[ERROR]`, MSVC `file(line,col)`, `--- FAIL:`) y llena la lista quickfix para saltar al error con `:cn` / `:cp`. Se abre automáticamente si el comando falla
 - Variables de contexto: `$testName` (test bajo el cursor), `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto) en cualquier comando
 
@@ -27,7 +28,13 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
   dependencies = { "nvzone/volt" }, -- opcional, para el picker
   opts = {
     ui = "auto", -- "volt" | "select" | "auto"
-    terminal = { direction = "horizontal", height = 12 },
+    terminal = {
+      direction = "horizontal", -- "horizontal" | "vertical" | "float"
+      height = 12,
+      vertical_width = 45,
+      float = { width = 0.8, height = 0.6 }, -- fracciones del editor
+      autoclose = true, -- cerrar la terminal al terminar con éxito
+    },
     autosave = true,
     picker = {
       title = "CodeRunner", -- título del picker: "⚡ CodeRunner · App.java"
@@ -81,13 +88,13 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (96 tests). Corre con:
+Suite propia sin dependencias externas (104 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
 ```
 
-Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
+Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable, overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, flotante y autoclose al éxito) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
 
 Exit code `1` si algo falla, apto para CI.
 

@@ -12,9 +12,16 @@ M.defaults = {
     hl_hint = "CommentFg",
   },
   terminal = {
-    direction = "horizontal", -- "horizontal" | "vertical"
+    direction = "horizontal", -- "horizontal" | "vertical" | "float"
     height = 12,
     vertical_width = 45,
+    float = {
+      -- Fracciones del editor para la terminal flotante
+      width = 0.8,
+      height = 0.6,
+    },
+    -- Cerrar la terminal al terminar con éxito (exit code 0)
+    autoclose = true,
   },
   icons = {
     run = "",
