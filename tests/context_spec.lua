@@ -234,6 +234,145 @@ T.it("lua no tiene entry (el script completo es el programa)", function()
   T.falsy(detect().entry)
 end)
 
+T.it("regression: ts_entry no explota cuando node:start() devuelve (row, col)", function()
+  -- Node real de tree-sitter: node:start() retorna row, col (numeros).
+  -- Antes se usaba node:start()[1] -> 'attempt to index a number value'.
+  open("mock_app.py", { "x = 1" })
+
+  local orig_get_parser = vim.treesitter.get_parser
+  local orig_parse = vim.treesitter.query.parse
+  local orig_get_text = vim.treesitter.get_node_text
+
+  local fake_query = {
+    captures = { [1] = "name" },
+    iter_captures = function()
+      local i = 0
+      return function()
+        i = i + 1
+        if i > 1 then
+          return nil
+        end
+        local node = {
+          start = function()
+            return 3, 0 -- row, col
+          end,
+        }
+        return 1, node
+      end
+    end,
+  }
+
+  vim.treesitter.query.parse = function()
+    return vim.deepcopy(fake_query)
+  end
+  vim.treesitter.get_node_text = function()
+    return "main"
+  end
+  vim.treesitter.get_parser = function()
+    return {
+      parse = function()
+        return {
+          {
+            root = function()
+              return {}
+            end,
+          },
+        }
+      end,
+    }
+  end
+
+  local entry
+  local ok = not not pcall(function()
+    entry = detect().entry
+  end)
+
+  vim.treesitter.get_parser = orig_get_parser
+  vim.treesitter.query.parse = orig_parse
+  vim.treesitter.get_node_text = orig_get_text
+
+  T.truthy(ok, "detect() sobrevive al ts_entry con node:start() numerico")
+  T.truthy(entry)
+  T.eq("main", entry.name)
+  T.eq(4, entry.line)
+end)
+
+T.it("regression: main_str usa la linea del if_statement no del string", function()
+  open("mock_guard.py", { "x = 1" })
+
+  local orig_get_parser = vim.treesitter.get_parser
+  local orig_parse = vim.treesitter.query.parse
+  local orig_get_text = vim.treesitter.get_node_text
+
+  vim.treesitter.query.parse = function()
+    return {
+      captures = { [1] = "main_str" },
+      iter_captures = function()
+        local i = 0
+        return function()
+          i = i + 1
+          if i > 1 then
+            return nil
+          end
+          local string_node = {
+            start = function()
+              return 7, 15
+            end,
+            parent = function()
+              return {
+                type = function()
+                  return "comparison_operator"
+                end,
+                parent = function()
+                  return {
+                    type = function()
+                      return "if_statement"
+                    end,
+                    start = function()
+                      return 5, 0
+                    end,
+                  }
+                end,
+              }
+            end,
+          }
+          return 1, string_node
+        end
+      end,
+    }
+  end
+  vim.treesitter.get_node_text = function()
+    return '"__main__"'
+  end
+  vim.treesitter.get_parser = function()
+    return {
+      parse = function()
+        return {
+          {
+            root = function()
+              return {}
+            end,
+          },
+        }
+      end,
+    }
+  end
+
+  local entry
+  local ok = not not pcall(function()
+    entry = detect().entry
+  end)
+
+  vim.treesitter.get_parser = orig_get_parser
+  vim.treesitter.query.parse = orig_parse
+  vim.treesitter.get_node_text = orig_get_text
+
+  T.truthy(ok, "detect() sobrevive al main_str")
+  T.truthy(entry)
+  T.eq("__main__", entry.name)
+  T.eq(6, entry.line)
+end)
+
 T.section("context: acción contextual Run test")
 
 T.it("test_action devuelve label y cmd con $testName", function()

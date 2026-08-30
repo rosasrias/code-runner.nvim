@@ -254,7 +254,7 @@ local TS_QUERIES = {
   go = { "(function_declaration name: (identifier) @name)" },
   python = {
     "(function_definition name: (identifier) @name)",
-    "(if_statement (string) @main_str)",
+    "(string) @main_str",
   },
   java = { "(method_declaration name: (identifier) @name)" },
   rust = { "(function_item name: (identifier) @name)" },
@@ -301,14 +301,26 @@ local function ts_entry(lang, buf)
 
         if cap == "name" and (txt == "main" or txt == "__main__") and not main_if_found then
           if txt == "__main__" then
-            main_if_found = { name = "__main__", line = node:start()[1] + 1 }
+            main_if_found = { name = "__main__", line = node:start() + 1 }
           elseif not main_found then
-            main_found = { name = "main", line = node:start()[1] + 1 }
+            main_found = { name = "main", line = node:start() + 1 }
           end
         end
 
         if cap == "main_str" and txt:find("__main__", 1, true) then
-          main_if_found = { name = "__main__", line = node:start()[1] + 1 }
+          -- Sube hasta el if_statement que contiene el string (guard multilinea)
+          local line_node = node
+          local p = node:parent()
+
+          while p do
+            if p:type() == "if_statement" then
+              line_node = p
+              break
+            end
+            p = p:parent()
+          end
+
+          main_if_found = { name = "__main__", line = line_node:start() + 1 }
         end
       end
     end

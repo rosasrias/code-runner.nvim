@@ -135,7 +135,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (128 tests). Corre con:
+Suite propia sin dependencias externas (131 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
