@@ -215,14 +215,32 @@ T.it("el float recibe segmentos con color", function()
   clean_windows()
 end)
 
-T.it("_label_parts colorea la acción según su icono", function()
+T.it("_label_parts colorea con los grupos propios del plugin", function()
   local icons = config.options.icons
   local parts = terminal._label_parts(icons.run .. " Run")
 
   T.eq(config.options.terminal.title, parts[1][1])
-  T.eq(config.options.terminal.hl_title, parts[1][2])
+  T.eq("CodeRunnerTermTitle", parts[1][2])
   T.eq(icons.run .. " Run", parts[3][1])
-  T.eq(config.options.picker.hl_run, parts[3][2], "action run con hl_run")
+  T.eq("CodeRunnerActionRun", parts[3][2], "acción run con el grupo del plugin")
+end)
+
+T.section("terminal: grupos de resaltado expuestos (base46)")
+
+T.it("los grupos propios existen después de setup y no pisan overrides", function()
+  require "code-runner.highlight".setup()
+
+  local link = "ExGreen"
+  config.options.picker.hl_run = link
+
+  for _, name in ipairs(require("code-runner.highlight").names) do
+    local ok, hl = pcall(vim.api.nvim_get_hl, 0, { name = name })
+    T.truthy(ok and hl, "grupo " .. name .. " definido")
+  end
+
+  -- idempotente: definirlo de nuevo no rompe nada
+  require "code-runner.highlight".setup()
+  T.truthy(true)
 end)
 
 T.section("terminal: al terminar se mantiene abierta con ayuda")

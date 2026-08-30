@@ -5,6 +5,9 @@ M.defaults = {
   ui = "auto",
   picker = {
     title = "CodeRunner", -- el título se muestra como "⚡ <title> · <archivo>"
+    -- Colores de la acción en el picker y la terminal. Son los targets por
+    -- default de los grupos propios CodeRunnerActionRun/Build/Misc (ver
+    -- lua/code-runner/highlight.lua): se pueden tocar en base46.
     hl_selected = "ExBlue",
     hl_run = "ExGreen",
     hl_build = "ExYellow",
@@ -23,8 +26,10 @@ M.defaults = {
     -- Título de la ventana de la terminal (winbar en splits, título en float).
     -- Se le concatena la acción elegida (Run/Build) coloreada según su icono.
     title = "⚡ CodeRunner · Terminal",
-    -- Colores del título: base, estado OK y estado con error.
-    -- Los grupos Ex* vienen del tema "ecotic" (ojo si cambiás de tema).
+    -- El plugin expone sus propios grupos de resaltado (CodeRunnerTermTitle,
+    -- CodeRunnerTermOk, CodeRunnerTermErr, CodeRunnerActionRun/Build/Misc) que
+    -- por default enlazan a los colores de abajo. Vos podés personalizarlos en
+    -- tu capa de highlights (base46 / override) o cambiando aquí los targets.
     hl_title = "ExBlue",
     hl_status_ok = "ExGreen",
     hl_status_err = "ExYellow",

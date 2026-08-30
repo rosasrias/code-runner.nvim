@@ -52,19 +52,17 @@ local function volt_pick(items, opts, on_choice, volt)
   local hl_hint = opts.hl_hint or config.options.picker.hl_hint
 
   local icons = config.options.icons
-  local hl_run = config.options.picker.hl_run
-  local hl_build = config.options.picker.hl_build
-  local hl_misc = config.options.picker.hl_misc
 
-  -- Color según el tipo de acción (por su icono)
+  -- Color según el tipo de acción (por su icono): grupos propios del plugin,
+  -- personalizables en un solo lugar (config.options.picker o base46).
   local function item_hl(label)
     if icons.run ~= "" and label:find(icons.run, 1, true) then
-      return hl_run
+      return "CodeRunnerActionRun"
     end
     if icons.build ~= "" and label:find(icons.build, 1, true) then
-      return hl_build
+      return "CodeRunnerActionBuild"
     end
-    return hl_misc
+    return "CodeRunnerActionMisc"
   end
 
   ---------------------------------------------------------

@@ -6,6 +6,7 @@ local last_choice = nil
 
 M.setup = function(opts)
 	config.setup(opts)
+	require("code-runner.highlight").setup()
 end
 
 local function autosave()

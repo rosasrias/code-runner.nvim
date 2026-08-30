@@ -122,28 +122,26 @@ function M._maybe_autoclose(buf, code)
   return true
 end
 
--- Color de la acción según su icono (repite la lógica del picker)
+-- Color de la acción según su icono (repite la lógica del picker con los
+-- grupos propios del plugin, personalizables en base46)
 local function label_hl(label)
   local icons = config.options.icons
 
   if icons.run ~= "" and label:find(icons.run, 1, true) then
-    return config.options.picker.hl_run
+    return "CodeRunnerActionRun"
   end
 
   if icons.build ~= "" and label:find(icons.build, 1, true) then
-    return config.options.picker.hl_build
+    return "CodeRunnerActionBuild"
   end
 
-  return config.options.picker.hl_misc
+  return "CodeRunnerActionMisc"
 end
 
 -- Segmentos [texto, hl] del título: base + la acción elegida coloreada.
 -- Expuesto como M._label_parts para tests.
 function M._label_parts(label)
-  local p = config.options.picker
-  local t = config.options.terminal
-
-  local parts = { { t.title, t.hl_title or p.hl_misc } }
+  local parts = { { config.options.terminal.title, "CodeRunnerTermTitle" } }
 
   if label and label ~= "" then
     parts[#parts + 1] = " · "
@@ -238,9 +236,9 @@ function M._exit_hint(buf, code)
   local parts = M._label_parts(vim.b[buf].code_runner_label)
 
   if ok then
-    parts[#parts + 1] = { " · ✓ terminó OK · q cierra", t.hl_status_ok }
+    parts[#parts + 1] = { " · ✓ terminó OK · q cierra", "CodeRunnerTermOk" }
   else
-    parts[#parts + 1] = { (" · ✗ error %d · q cierra"):format(code), t.hl_status_err }
+    parts[#parts + 1] = { (" · ✗ error %d · q cierra"):format(code), "CodeRunnerTermErr" }
   end
 
   M._apply_window_label(buf, parts)

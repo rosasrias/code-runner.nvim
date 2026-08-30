@@ -98,6 +98,32 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
 }
 ```
 
+## Colores (base46 / highlights)
+
+El plugin define sus **propios grupos de resaltado** como defaults (enlazados a
+`opts.picker`/`opts.terminal`), así picker y terminal comparten color y los
+personalizás en un solo lugar desde tu capa de highlights:
+
+| Grupo | Default | Para qué |
+|---|---|---|
+| `CodeRunnerActionRun` | `picker.hl_run` | ícono+acción con ícono de ejecutar |
+| `CodeRunnerActionBuild` | `picker.hl_build` | ícono+acción con ícono de compilar |
+| `CodeRunnerActionMisc` | `picker.hl_misc` | otras acciones / picker sin ícono |
+| `CodeRunnerTermTitle` | `terminal.hl_title` | título `⚡ CodeRunner · Terminal` |
+| `CodeRunnerTermOk` | `terminal.hl_status_ok` | estado `✓ terminó OK · q cierra` |
+| `CodeRunnerTermErr` | `terminal.hl_status_err` | estado `✗ error N · q cierra` |
+
+Ejemplo: título de la terminal con **fondo azul y texto negro**, desde tu
+override de highlights (base46/NvChad, `lua/plugins/highlights.lua`):
+
+```lua
+M.override = {
+  CodeRunnerTermTitle = { fg = "#000000", bg = "#2E5BFF", bold = true },
+  CodeRunnerTermOk     = { fg = "#9ece6a" },
+  CodeRunnerTermErr    = { fg = "#f7768e" },
+}
+```
+
 ## Uso
 
 | Comando        | Descripción                          |
