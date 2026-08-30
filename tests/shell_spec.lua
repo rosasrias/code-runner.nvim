@@ -1,5 +1,15 @@
 local shell = require "code-runner.shell"
 
+-- Compara rutas normalizando separadores (expand puede devolver \ en Windows
+-- aunque el fixture se construyó con /).
+local function slashes(p)
+  return (p or ""):gsub("\\", "/")
+end
+
+local function norm(p)
+  return slashes(vim.fs.normalize(p))
+end
+
 T.section("shell: substitute()")
 
 -- Contexto: buffer con ruta que contiene espacios
@@ -10,20 +20,20 @@ vim.fn.writefile({ "-- test", "print(1)" }, file)
 vim.cmd("edit " .. vim.fn.fnameescape(file))
 
 T.it("% expande a la ruta completa del archivo", function()
-  T.eq(file, shell.substitute("%"))
+  T.eq(norm(file), norm(shell.substitute("%")))
 end)
 
 T.it("$fileBase expande a ruta sin extensión", function()
-  T.eq(tmpdir .. "/mi programa", shell.substitute("$fileBase"))
+  T.eq(norm(tmpdir .. "/mi programa"), norm(shell.substitute("$fileBase")))
 end)
 
 T.it("$filePath y $dir expanden correctamente", function()
-  T.eq(file, shell.substitute("$filePath"))
-  T.eq(tmpdir, shell.substitute("$dir"))
+  T.eq(norm(file), norm(shell.substitute("$filePath")))
+  T.eq(norm(tmpdir), norm(shell.substitute("$dir")))
 end)
 
 T.it("precedencia: $filePath no es cortado por $file", function()
-  T.eq(file .. " " .. file, shell.substitute("$filePath $file"))
+  T.eq(slashes(file .. " " .. file), slashes(shell.substitute("$filePath $file")))
 end)
 
 T.it("tokens desconocidos se preservan ($PATH)", function()
@@ -32,8 +42,8 @@ end)
 
 T.it("plantilla gcc con espacios en ruta", function()
   local out = shell.substitute('gcc "%" -o "$fileBase' .. shell.EXE_SUFFIX .. '"')
-  T.contains(out, '"' .. file .. '"', "fuente entre comillas")
-  T.contains(out, '"' .. tmpdir .. "/mi programa" .. shell.EXE_SUFFIX .. '"', "salida entre comillas")
+  T.contains(slashes(out), '"' .. slashes(file) .. '"', "fuente entre comillas")
+  T.contains(slashes(out), '"' .. slashes(tmpdir .. "/mi programa") .. shell.EXE_SUFFIX .. '"', "salida entre comillas")
 end)
 
 T.it("$altFile expande al alternate file", function()
@@ -42,7 +52,7 @@ T.it("$altFile expande al alternate file", function()
   -- editar A luego B deja A como alternate desde B
   vim.cmd("edit " .. vim.fn.fnameescape(file))
   vim.cmd("edit " .. vim.fn.fnameescape(other))
-  T.eq(file, shell.substitute("$altFile"))
+  T.eq(norm(file), norm(shell.substitute("$altFile")))
   vim.cmd("edit " .. vim.fn.fnameescape(file))
 end)
 
