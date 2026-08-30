@@ -209,7 +209,7 @@ end
 -- Estado final visible en la ventana y mensaje claro de cómo cerrarla
 -- (tanto para compilación como para ejecución o ambas).
 -- Expuesto como M._exit_hint para tests.
-function M._exit_hint(buf, code)
+function M._exit_hint(buf, code, qf_count)
   if not vim.api.nvim_buf_is_valid(buf) then
     return
   end
@@ -218,10 +218,19 @@ function M._exit_hint(buf, code)
   local t = config.options.terminal
 
   if not ok then
-    M.notify(
-      ("El comando terminó con error (código %d). Revisa la salida; los errores de build/test ya están en el quickfix (:cn)."):format(code),
-      vim.log.levels.ERROR
-    )
+    local msg
+
+    if qf_count and qf_count > 0 then
+      msg = (
+        "El comando terminó con error (código %d). %d problema(s) en la lista quickfix (:cn / :cl)."
+      ):format(code, qf_count)
+    else
+      msg = (
+        "El comando terminó con error (código %d). No se detectaron errores parseables en la salida; revisá la terminal."
+      ):format(code)
+    end
+
+    M.notify(msg, vim.log.levels.ERROR)
   else
     M.notify(
       "El comando terminó correctamente (código 0). Revisa la salida y cierra esta terminal con q.",
@@ -246,7 +255,7 @@ end
 
 -- Estado al salir del proceso: quickfix + closure según la configuración.
 function M._on_exit(buf, code, cwd)
-  require("code-runner.quickfix").handle(buf, code, cwd)
+  local qf_count = require("code-runner.quickfix").handle(buf, code, cwd)
 
   local cfg = config.options.terminal
 
@@ -256,7 +265,7 @@ function M._on_exit(buf, code, cwd)
     end
   end
 
-  M._exit_hint(buf, code)
+  M._exit_hint(buf, code, qf_count)
 end
 
 -- Abre (o reutiliza) una terminal con el comando ya envuelto para el shell.

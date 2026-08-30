@@ -67,6 +67,39 @@ T.it("./ en la ruta se limpia y resuelve contra el cwd", function()
   T.eq(norm_win(CWD .. "/test_spec.rb"), entries[1].filename)
 end)
 
+T.it("python traceback: File \"path\", line N", function()
+  local entries = quickfix.parse({
+    "Traceback (most recent call last):",
+    '  File "src\\app.py", line 4, in <module>',
+    "    x = 1",
+    "NameError: name 'x' is not defined",
+  }, CWD)
+  T.eq(1, #entries)
+  T.eq(norm_win(CWD .. "/src/app.py"), norm_win(entries[1].filename))
+  T.eq(4, entries[1].lnum)
+  T.falsy(entries[1].col, "sin columna")
+end)
+
+T.it("python traceback con ruta absoluta no usa el cwd", function()
+  local entries = quickfix.parse({
+    '  File "C:\\Otro\\mod.py", line 12, in foo',
+    "    raise RuntimeError",
+  }, CWD)
+  T.eq(norm_win("C:/Otro/mod.py"), norm_win(entries[1].filename))
+  T.eq(12, entries[1].lnum)
+end)
+
+T.it("handle devuelve 0 cuando no se parsea nada", function()
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { "Command not found", "oops" })
+  local cwd = vim.fn.getcwd()
+
+  local count = quickfix.handle(buf, 1, cwd)
+  T.eq(0, count)
+
+  vim.api.nvim_buf_delete(buf, { force = true })
+end)
+
 T.it("sin coincidencias -> lista vacía", function()
   local entries = quickfix.parse({ "hello world", "", "Success! built in 2s" }, CWD)
   T.eq(0, #entries)

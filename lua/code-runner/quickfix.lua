@@ -19,6 +19,7 @@ local RULES = {
     pattern = "^(.-)%((%d+),(%d+)%)%s*:%s*(.-)%s*:%s*(.*)$",
     msvc = true,
   },
+  { pattern = '^%s*File%s+"([^"]+)",%s+line%s+(%d+)(.*)$' },
   { pattern = "^(.-):(%d+):(%d+)%s*:%s*(.*)$" },
   { pattern = "^(.-):(%d+)%s*:%s*(.*)$" },
   { pattern = "^%-%-%-%s*(FAIL:%s*.*)$", fail = true },
@@ -84,16 +85,18 @@ function M.parse(lines, cwd)
 end
 
 -- Lee el buffer de terminal, parsea y llena la lista quickfix.
+-- Devuelve cuántas entradas quedaron (0 = nada parseable).
 function M.handle(buf, code, cwd)
   if not config.options.quickfix.enabled then
-    return
+    return 0
   end
 
   local lines = vim.api.nvim_buf_get_lines(buf, 0, -1, false)
   local entries = M.parse(lines, cwd)
+  local count = #entries
 
-  if #entries == 0 then
-    return
+  if count == 0 then
+    return 0
   end
 
   vim.fn.setqflist(entries, "r")
@@ -106,10 +109,12 @@ function M.handle(buf, code, cwd)
   end
 
   vim.notify(
-    ("%d problema(s) encontrados, ver la lista quickfix (:cl / :cn)"):format(#entries),
+    ("%d problema(s) encontrados, ver la lista quickfix (:cl / :cn)"):format(count),
     vim.log.levels.WARN,
     { title = "code-runner.nvim" }
   )
+
+  return count
 end
 
 -- Expuesto para tests
