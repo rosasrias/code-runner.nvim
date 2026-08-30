@@ -131,7 +131,10 @@ local function with_absolute_buffer(callback)
   vim.cmd("edit " .. vim.fn.fnameescape(f))
 
   local ok, err = pcall(function()
-    T.truthy(vim.fn.expand "%:r":match "^%a:[/\\]", "precondición: %:r absoluto")
+    local base = vim.fn.expand "%:r"
+    local is_rel = base:match "^cr_rel_fixture" ~= nil
+    local is_abs = base:match "^%a:[/\\]" ~= nil or base:sub(1, 1) == "/"
+    T.truthy(not is_rel and is_abs, "precondición: %:r absoluto")
     callback()
   end)
 

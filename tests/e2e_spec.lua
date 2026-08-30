@@ -34,6 +34,35 @@ if vim.fn.executable "gcc" == 1 then
     T.eq(0, vim.v.shell_error, "compile & run sin errores")
     T.contains(out, marker, "salida del binario")
   end)
+
+  T.it("compilar con un error produce entrada quickfix en la línea correcta", function()
+    local dir = vim.fn.tempname() .. "/cr_e2e_qf"
+    vim.fn.mkdir(dir, "p")
+
+    -- error deliberado en la línea 3
+    local src = dir .. "/bad.c"
+    vim.fn.writefile({ "int main(void) {", "  int x;", "  x = x + ;", "  return 0;", "}" }, src)
+    vim.cmd("edit " .. vim.fn.fnameescape(src))
+
+    local icons = config.options.icons
+    local compile
+    for _, label in ipairs(actions.get_actions().c.__order) do
+      if not label:find("Run", 1, true) and not label:find("Compile & Run", 1, true) then
+        compile = label
+      end
+    end
+
+    shell.IS_WIN = PLATFORM_WIN
+    local cmd = shell.substitute(actions.get_actions().c[compile])
+    local out = vim.fn.system(shell.wrap_command(cmd))
+
+    local qf = require "code-runner.quickfix"
+    local entries = qf.parse(vim.split(out, "\n"), dir)
+
+    T.truthy(#entries >= 1, "al menos un error parseado")
+    T.eq(3, entries[1].lnum, "la línea del error es la 3")
+    T.truthy(entries[1].filename:find("bad.c", 1, true), "apunta a bad.c")
+  end)
 else
   T.skip("plantilla C", "gcc no está en PATH")
 end

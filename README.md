@@ -1,5 +1,7 @@
 # ⚡ code-runner.nvim
 
+![CI](https://img.shields.io/github/actions/workflow/status/rosasrias/code-runner.nvim/ci.yml?branch=main&label=CI)
+
 Runner de código para Neovim con selector de acciones (picker propio basado en [nvzone/volt](https://github.com/nvzone/volt), con fallback a `vim.ui.select`).
 
 ## Características
