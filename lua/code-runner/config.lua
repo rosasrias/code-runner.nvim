@@ -20,8 +20,13 @@ M.defaults = {
       width = 0.8,
       height = 0.6,
     },
-    -- Cerrar la terminal al terminar con éxito (exit code 0)
-    autoclose = true,
+    -- Título de la ventana de la terminal (winbar en splits, título en float).
+    -- Se le concatena la acción elegida (Run/Build).
+    title = "⚡ CodeRunner · Terminal",
+    -- Cerrar la terminal al terminar con éxito (exit code 0).
+    -- Con false (default) la terminal se queda abierta, muestra la salida y
+    -- cierra con "q"; con true se cierra sola cuando el proceso termina OK.
+    autoclose = false,
   },
   icons = {
     run = "",

@@ -99,9 +99,88 @@ function M._maybe_autoclose(buf, code)
   return true
 end
 
+-- Pone el texto de la ventana de la terminal: title del float o winbar en
+-- los splits. Expuesto como M._apply_window_label para tests.
+function M._apply_window_label(buf, text)
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if not vim.api.nvim_win_is_valid(win) or vim.api.nvim_win_get_buf(win) ~= buf then
+      goto continue
+    end
+
+    if vim.api.nvim_win_get_config(win).relative ~= "" then
+      vim.api.nvim_win_set_config(win, { title = text })
+    else
+      vim.wo[win].winbar = " " .. text
+    end
+
+    ::continue::
+  end
+end
+
+-- Cierra la ventana que muestra `buf` y libera el buffer del plugin.
+-- Expuesto como M._close_current para tests.
+function M._close_current(buf)
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_is_valid(win) and vim.api.nvim_win_get_buf(win) == buf then
+      pcall(vim.api.nvim_win_close, win, true)
+    end
+  end
+
+  if vim.api.nvim_buf_is_valid(buf) then
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
+  end
+end
+
+-- Estado final visible en la ventana y mensaje claro de cómo cerrarla
+-- (tanto para compilación como para ejecución o ambas).
+-- Expuesto como M._exit_hint para tests.
+function M._exit_hint(buf, code)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  local ok = code == 0
+
+  if not ok then
+    M.notify(
+      ("El comando terminó con error (código %d). Revisa la salida; los errores de build/test ya están en el quickfix (:cn)."):format(code),
+      vim.log.levels.ERROR
+    )
+  else
+    M.notify(
+      "El comando terminó correctamente (código 0). Revisa la salida y cierra esta terminal con q.",
+      vim.log.levels.INFO
+    )
+  end
+
+  vim.keymap.set("n", "q", function()
+    M._close_current(buf)
+  end, { buffer = buf, nowait = true, desc = "Cerrar terminal de code-runner" })
+
+  local base = vim.b[buf].code_runner_title or config.options.terminal.title
+  local suffix = ok and " · ✓ terminó OK · q cierra" or (" · ✗ error %d · q cierra"):format(code)
+  M._apply_window_label(buf, base .. suffix)
+end
+
+-- Estado al salir del proceso: quickfix + closure según la configuración.
+function M._on_exit(buf, code, cwd)
+  require("code-runner.quickfix").handle(buf, code, cwd)
+
+  local cfg = config.options.terminal
+
+  if cfg.autoclose and code == 0 then
+    if M._maybe_autoclose(buf, code) then
+      return
+    end
+  end
+
+  M._exit_hint(buf, code)
+end
+
 -- Abre (o reutiliza) una terminal con el comando ya envuelto para el shell.
 -- cwd (opcional): directorio en el que arranca el job (raíz del proyecto).
-function M.open(cmd, direction, cwd)
+-- label (opcional): acción elegida (Run/Build) para el título de la ventana.
+function M.open(cmd, direction, cwd, label)
   direction = direction or config.options.terminal.direction
   local command = shell.wrap_command(cmd)
 
@@ -116,6 +195,14 @@ function M.open(cmd, direction, cwd)
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(buf, M.BUF_NAME)
   vim.api.nvim_win_set_buf(0, buf)
+
+  local title = config.options.terminal.title
+  if label and label ~= "" then
+    title = title .. " · " .. label
+  end
+  vim.b[buf].code_runner_title = title
+  M._apply_window_label(buf, title)
+
   local opts = {}
 
   if cwd and cwd ~= "" then
@@ -123,8 +210,7 @@ function M.open(cmd, direction, cwd)
   end
 
   opts.on_exit = function(_, code)
-    require("code-runner.quickfix").handle(buf, code, cwd)
-    M._maybe_autoclose(buf, code)
+    M._on_exit(buf, code, cwd)
   end
 
   vim.fn.termopen(command, opts)

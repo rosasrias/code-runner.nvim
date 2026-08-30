@@ -39,8 +39,9 @@ end
 
 T.section("terminal: defaults y public API")
 
-T.it("los defaults incluyen float y autoclose", function()
-  T.eq(true, config.options.terminal.autoclose)
+T.it("los defaults mantienen la terminal abierta con título propio", function()
+  T.eq(false, config.options.terminal.autoclose)
+  T.truthy(config.options.terminal.title)
   T.truthy(config.options.terminal.float.width)
   T.truthy(config.options.terminal.float.height)
 end)
@@ -132,6 +133,83 @@ T.it("autoclose=false nunca cierra", function()
 
   clean_windows()
   config.options.terminal = vim.deepcopy(config.defaults.terminal)
+end)
+
+T.section("terminal: título visible (winbar/float)")
+
+T.it("la ventana float recibe el título en su borde", function()
+  vim.cmd "only"
+  local buf = vim.api.nvim_create_buf(false, true)
+  local win = vim.api.nvim_open_win(buf, true, {
+    relative = "editor",
+    width = 20,
+    height = 10,
+    row = 1,
+    col = 1,
+    style = "minimal",
+    border = "rounded",
+  })
+
+  terminal._apply_window_label(buf, "⚡ CodeRunner · Terminal · Build")
+
+  local title = vim.api.nvim_win_get_config(win).title
+  T.truthy(vim.inspect(title):find("CodeRunner · Terminal · Build", 1, true), "el título del float está presente")
+
+  clean_windows()
+end)
+
+T.it("los splits muestran la terminal en su winbar", function()
+  clean_windows()
+  vim.cmd "only"
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.cmd "split"
+  vim.api.nvim_win_set_buf(0, buf)
+
+  terminal._apply_window_label(buf, "⚡ CodeRunner · Terminal · Run")
+
+  local wb = vim.wo[0].winbar or ""
+  T.truthy(wb:find("Terminal", 1, true), "winbar contiene el título")
+
+  clean_windows()
+end)
+
+T.section("terminal: al terminar se mantiene abierta con ayuda")
+
+T.it("sin autoclose queda abierta, avisa y ofrece q para cerrar", function()
+  config.options.terminal.autoclose = false
+  local term_buf = with_term_window()
+  local before = #vim.api.nvim_list_wins()
+
+  terminal._exit_hint(term_buf, 0)
+
+  T.eq(before, #vim.api.nvim_list_wins(), "la ventana sigue abierta")
+
+  local has_q = false
+  for _, m in ipairs(vim.api.nvim_buf_get_keymap(term_buf, "n")) do
+    if m.lhs == "q" then
+      has_q = true
+      break
+    end
+  end
+
+  T.truthy(has_q, "existe el mapa q para cerrar la terminal")
+
+  terminal._close_current(term_buf)
+  T.falsy(vim.api.nvim_buf_is_valid(term_buf), "se libera el buffer del plugin")
+
+  clean_windows()
+end)
+
+T.it("con error también queda abierta y marca el título", function()
+  config.options.terminal.autoclose = false
+  local term_buf = with_term_window()
+
+  terminal._exit_hint(term_buf, 2)
+
+  local wb = vim.wo[0].winbar or ""
+  T.truthy(wb:find("error", 1, true), "el winbar avisa del fallo")
+
+  clean_windows()
 end)
 
 pcall(clean_windows)

@@ -18,7 +18,7 @@ local function autosave()
 	end
 end
 
-local function execute_action(action, vars, cwd, key)
+local function execute_action(action, vars, cwd, key, label)
 	local shell = require("code-runner.shell")
 	local terminal = require("code-runner.terminal")
 
@@ -31,7 +31,7 @@ local function execute_action(action, vars, cwd, key)
 	end
 
 	local cmd = shell.substitute(action, vars, key)
-	terminal.open(cmd, nil, cwd)
+	terminal.open(cmd, nil, cwd, label)
 	require("code-runner.history").add(cmd, cwd, key)
 end
 
@@ -119,7 +119,7 @@ function M.build_run()
 			cwd = cwd,
 		}
 
-		execute_action(entry[choice], { ["$testName"] = last_choice.test }, cwd, key)
+		execute_action(entry[choice], { ["$testName"] = last_choice.test }, cwd, key, choice)
 	end)
 end
 
@@ -136,7 +136,7 @@ function M.run_last()
 
 	-- Repetición fiel de un "Run test": el comando quedó guardado con su contexto
 	if last_choice.cmd then
-		execute_action(last_choice.cmd, { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang)
+		execute_action(last_choice.cmd, { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang, last_choice.choice)
 		return
 	end
 
@@ -148,7 +148,7 @@ function M.run_last()
 		return
 	end
 
-	execute_action(action, nil, last_choice.cwd, last_choice.lang)
+	execute_action(action, nil, last_choice.cwd, last_choice.lang, last_choice.choice)
 end
 
 -- Selector del historial: re-ejecuta una entrada guardada
