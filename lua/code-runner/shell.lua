@@ -27,6 +27,9 @@ local SUBSTITUTIONS = {
   ["$file"] = function()
     return vim.fn.expand "%"
   end,
+  ["$stem"] = function()
+    return vim.fn.expand "%:t:r"
+  end,
 }
 
 -- Invocación correcta del binario de $fileBase en cualquier plataforma y
@@ -47,13 +50,24 @@ SUBSTITUTIONS["$binRun"] = function()
   return M.bin_run()
 end
 
--- % y tokens $var en una sola pasada; los desconocidos se dejan intactos
-function M.substitute(cmd)
-  local out = cmd:gsub("%%", SUBSTITUTIONS["$file"])
+-- % y tokens $var en una sola pasada; los desconocidos se dejan intactos.
+-- vars permite inyectar valores por token (ej: { ["$testName"] = "TestFoo" }).
+function M.substitute(cmd, vars)
+  vars = vars or {}
+
+  local out = cmd:gsub("%%l", tostring(vim.api.nvim_win_get_cursor(0)[1]))
+  out = out:gsub("%%", SUBSTITUTIONS["$file"]())
 
   return (out:gsub("%$%w+", function(token)
     local expand_fn = SUBSTITUTIONS[token]
-    return expand_fn and expand_fn() or token
+
+    if expand_fn then
+      return expand_fn()
+    end
+
+    local val = vars[token]
+
+    return val ~= nil and tostring(val) or token
   end))
 end
 

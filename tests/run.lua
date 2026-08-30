@@ -19,6 +19,7 @@ dofile(plug_root .. "/tests/shell_spec.lua")
 dofile(plug_root .. "/tests/actions_spec.lua")
 dofile(plug_root .. "/tests/init_spec.lua")
 dofile(plug_root .. "/tests/picker_spec.lua")
+dofile(plug_root .. "/tests/context_spec.lua")
 dofile(plug_root .. "/tests/e2e_spec.lua")
 
 T.summary()

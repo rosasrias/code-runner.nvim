@@ -51,7 +51,7 @@ T.it("el usuario puede añadir acciones sin perder las default", function()
 
   local go = actions.get_actions().go
   T.truthy(go[" Vet"], "acción nueva del usuario")
-  T.truthy(go[" Run"], "acción default preservada")
+  T.truthy(go[config.options.icons.run .. " Run"], "acción default preservada")
 
   config.options = original
 end)

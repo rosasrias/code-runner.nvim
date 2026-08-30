@@ -1,0 +1,4 @@
+# Artefactos de compilación generados por los tests E2E
+*.exe
+*.class
+__pycache__/

@@ -21,6 +21,13 @@ M.defaults = {
     build = "󱤵 ",
   },
   autosave = true,
+  context = {
+    -- Detección de tests bajo el cursor y del entry point (main)
+    enabled = true,
+    -- Sobrescribir el comando de test por lenguaje (false desactiva ese lenguaje)
+    -- ej: { go = "gotestsum -- -run \"^$testName$\"", py = false }
+    test = {},
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)
