@@ -28,6 +28,23 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 | `:CodeRun` | Selecciona build/run en el picker |
 | `:CodeRunLast` | Repite la última ejecución |
 | `:CodeRunHistory` | Re-ejecuta desde el historial |
+| `:CodeRunStop` | Detiene la ejecución en marcha (solo la del plugin) |
+
+## Estado de ejecución
+
+`require("code-runner").state()` devuelve el estado central (copia):
+
+```lua
+{
+  status = "idle|running|success|failed|cancelled",
+  action = "Run",               -- label de la última ejecución
+  cwd = "C:\\proj",             -- directorio del job
+  filetype = "py",              -- key resuelta del archivo
+  buf = 12,                     -- buffer de terminal del job actual
+  code = 0,                     -- exit code (success/failed)
+  started_at = ..., ended_at = ..., run_id = 3,
+}
+```
 
 ## Instalación
 
@@ -132,18 +149,19 @@ M.override = {
 | -------------- | ------------------------------------ |
 | `:CodeRun`     | Abre el selector de acciones         |
 | `:CodeRunLast` | Repite la última acción ejecutada    |
+| `:CodeRunStop` | Detiene la ejecución en marcha (solo la del plugin) |
 
 En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>` o click para ejecutar, `q` para cerrar.
 
 ## Tests
 
-Suite propia sin dependencias externas (136 tests). Corre con:
+Suite propia sin dependencias externas (154 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua
 ```
 
-Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable (60+ lenguajes), overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, título/winbar, flotante, autoclose opt-in y cierre con `q`), historial persistente (dedupe, límites, archivos corruptos, integración con `:CodeRun`/`:CodeRunHistory`) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
+Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable (60+ lenguajes), overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, título/winbar, flotante, autoclose opt-in, cierre con `q`, reuso de ventana y `:CodeRunStop`), historial persistente (dedupe, límites, archivos corruptos, integración con `:CodeRun`/`:CodeRunHistory`) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix). Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.
 
 Exit code `1` si algo falla, apto para CI.
 

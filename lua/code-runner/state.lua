@@ -13,6 +13,7 @@ local function fresh(status)
     action = nil,   -- label de la acción elegida ("Run", "Run test · TestAdd", ...)
     cwd = nil,      -- directorio del job
     filetype = nil, -- key resuelta (java, py, go, ...)
+    buf = nil,      -- buffer de terminal del job actual (para stop/restart)
     code = nil,     -- exit code (success/failed)
     started_at = nil,
     ended_at = nil,
@@ -40,6 +41,7 @@ function M.set(status, info)
     current.action = info.action
     current.cwd = info.cwd
     current.filetype = info.filetype
+    current.buf = info.buf
     current.started_at = os.time()
     current.run_id = next_run
     return true

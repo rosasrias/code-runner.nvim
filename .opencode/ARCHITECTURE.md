@@ -13,10 +13,10 @@ lua/code-runner/
 ├── actions.lua    Catálogo de acciones por extensión/filetype + overrides
 ├── context.lua    Detección: test bajo el cursor + entry point (TS con fallback regex)
 ├── project.lua    Raíz del proyecto por marcadores (por lenguaje + genéricos)
-├── terminal.lua   Ventanas (h/v/float), título/winbar, estado, q, autoclose
+├── terminal.lua   Ventanas (h/v/float), título/winbar, estado, q, autoclose, stop
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
-├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id
+├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
 └── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
@@ -81,7 +81,8 @@ entradas; en éxito con `close_on_success` cierra y vacía, con warnings refresc
 
 `terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
 job; `_on_exit` registra `success`/`failed` con el exit code si el job sigue
-siendo el actual; `_close_current` (tecla `q`) registra `cancelled` si corría.
+siendo el actual; `_close_current` (tecla `q` o `:CodeRunStop`) registra
+`cancelled` si corría.
 
 **run_id**: cada ejecución incrementa una generación; el `on_exit` captura su
 propio `run_id` y solo transiciona si sigue siendo el del estado. Así, un
@@ -92,6 +93,15 @@ estado del que corre ahora.
 el job en el mismo buffer (antes: se creaba otro buffer con el mismo nombre →
 E95). Si el job anterior seguía corriendo, se cancela (`cancelled`) y se abre
 desde cero. La key/filetype se resuelve ANTES de cambiar la ventana actual.
+
+**Identificación del buffer propio**: `termopen` renombra el buffer a
+`term://cwd//pid:cmd`, así que el nombre no basta. Al crearlo se marca con
+`b:code_runner_term` (sobrevive al rename). La purga de huérfanos usa basename
+exacto `code-runner` + buffer no listado, para no tocar terminales ajenas
+(cuyo path puede contener "code-runner") ni archivos reales del usuario.
+
+**stop (P0 #2)**: `init.stop()` cierra el buffer del job actual vía
+`_close_current`; solo ese buffer. Terminales ajenas intactas.
 
 ## Picker
 

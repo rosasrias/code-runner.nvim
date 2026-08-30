@@ -4,6 +4,30 @@ local shell = require "code-runner.shell"
 local M = {}
 M.BUF_NAME = "code-runner"
 
+-- identificador de buffers del PLUGIN: marcador en b:variables que pusimos al
+-- crear el buffer y que sobrevive al rename que hace termopen (el nombre real
+-- pasa a ser term://cwd//pid:cmd, así que el nombre solo no es fiable).
+local PLUGIN_MARK = "code_runner_term"
+
+local function has_marker(b)
+  return vim.b[b] ~= nil and vim.b[b][PLUGIN_MARK] == true
+end
+
+-- Huérfano por convención de nombre (basename EXACTO + sin archivo listado):
+-- buffers que la terminal deja cuando se borra; jamás un archivo real del
+-- usuario que se llame "code-runner" (esos están listados y tienen buftype "").
+local function is_orphan_by_name(b)
+  if vim.fn.fnamemodify(vim.api.nvim_buf_get_name(b), ":t") ~= M.BUF_NAME then
+    return false
+  end
+
+  -- buflisted puede venir como 1/0 o true/false según la build
+  local listed = vim.bo[b].buflisted
+  local is_listed = listed == 1 or listed == true
+
+  return vim.bo[b].buftype == "terminal" or not is_listed
+end
+
 function M.notify(msg, level, title)
   level = level or vim.log.levels.INFO
 
@@ -48,7 +72,7 @@ local function get_last_terminal_window()
 
   for _, win in ipairs(vim.api.nvim_list_wins()) do
     local buf = vim.api.nvim_win_get_buf(win)
-    if vim.bo[buf].buftype == "terminal" and vim.api.nvim_buf_get_name(buf):find(M.BUF_NAME, 1, true) then
+    if has_marker(buf) then
       local pos = vim.api.nvim_win_get_position(win)
       table.insert(terms, { win = win, row = pos[1], col = pos[2] })
     end
@@ -318,17 +342,18 @@ function M.open(cmd, direction, cwd, label)
   end
 
   if not buf then
-    -- Purga buffers huérfanos de code-runner (sin ventana): su job ya no
-    -- corre o es nuestro y hay que reabrir. Dejarlos provoca E95 al crear
-    -- otro buffer con el mismo nombre.
+    -- Purga buffers del plugin que quedaron huérfanos (sin ventana): su job
+    -- ya no corre o es nuestro y hay que reabrir. Dejarlos provoca E95 al
+    -- crear otro buffer con el mismo nombre.
     for _, b in ipairs(vim.api.nvim_list_bufs()) do
-      if b ~= vim.api.nvim_get_current_buf() and vim.api.nvim_buf_get_name(b):find(M.BUF_NAME, 1, true) then
+      if b ~= vim.api.nvim_get_current_buf() and (has_marker(b) or is_orphan_by_name(b)) then
         pcall(vim.api.nvim_buf_delete, b, { force = true })
       end
     end
 
     buf = vim.api.nvim_create_buf(false, true)
     vim.api.nvim_buf_set_name(buf, M.BUF_NAME)
+    vim.b[buf][PLUGIN_MARK] = true
     vim.api.nvim_win_set_buf(0, buf)
   end
 
@@ -348,6 +373,7 @@ function M.open(cmd, direction, cwd, label)
     action = label ~= "" and label or nil,
     cwd = cwd,
     filetype = entry_key,
+    buf = buf,
   })
   local rid = state.get().run_id
 

@@ -43,12 +43,12 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | Módulo | Responsabilidad |
 | --- | --- |
 | `init.lua` | Orquestación: `setup`, `build_run` (picker), `run_last`, `run_history`, `state` |
-| `state.lua` | Estado central (`idle|running|success|failed|cancelled`) + `run_id` anti-carreras |
+| `state.lua` | Estado central (`idle|running|success|failed|cancelled`) + `run_id` anti-carreras + `buf` del job |
 | `config.lua` | Defaults + merge de `opts` |
 | `actions.lua` | Catálogo de acciones por lenguaje (tabla estática + overrides de usuario) |
 | `context.lua` | Detección de test bajo el cursor y entry point (main) vía TS/regex |
 | `project.lua` | Raíz del proyecto por marcadores por lenguaje + genéricos |
-| `terminal.lua` | Ventanas horizontales/verticales/float, título/winbar, `q`, autoclose |
+| `terminal.lua` | Ventanas horizontales/verticales/float, título/winbar, `q`, autoclose, reuso de ventana, stop |
 | `quickfix.lua` | Parseo de salida → lista quickfix (`:cn`/`:cp`), auto-close en éxito |
 | `history.lua` | Persistencia en `stdpath("data")/code-runner/history.json` |
 | `picker.lua` | Selector volt con fallback `vim.ui.select` |

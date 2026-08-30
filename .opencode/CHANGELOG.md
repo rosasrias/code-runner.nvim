@@ -24,6 +24,21 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
   en él) y se limpia su `modified`; si el job anterior seguía corriendo, se
   cancela y se abre desde cero. +11 tests (state: 11, incl. 2 de regresión E95).
 
+## :CodeRunStop (nunca procesos ajenos)
+
+- `init.stop()`: detiene SOLO el job cuyo buffer registra el estado (via
+  `terminal._close_current`: cierra la ventana y elimina el buffer → el job de
+  terminal muere con él). Sin job en marcha → WARN. Job con buffer ya muerto →
+  marca `cancelled`.
+- Comando `:CodeRunStop` en `plugin/code-runner.lua`.
+- **Identificación de buffers del plugin endurecida**: `termopen` renombra el
+  buffer a `term://cwd//pid:cmd`, así que el nombre dejaba de ser `code-runner`.
+  Ahora se marca el buffer al crearlo (`b:code_runner_term`) — sobrevive al
+  rename — y la purga de huérfanos usa basename exacto + buffer sin listar
+  (protege archivos reales del usuario y terminales ajenas cuyo path solo
+  contiene "code-runner", p.ej. dentro del propio repo; `buflisted` acepta
+  forma 0/1 y true/false según la build). +3 tests (stop: 3).
+
 ## 33ec363 — Quickfix se cierra y vacía sola en éxito
 
 - `quickfix.close_on_success` (default `true`): al re-ejecutar con éxito la

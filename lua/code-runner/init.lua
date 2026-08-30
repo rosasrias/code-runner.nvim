@@ -195,9 +195,38 @@ M._project_cwd = project_cwd
 
 -- Estado de la ejecución actual/última del plugin (copia inmutable):
 -- { status = "idle|running|success|failed|cancelled", action, cwd,
---   filetype, code, started_at, ended_at }
+--   filetype, buf, code, started_at, ended_at }
 function M.state()
 	return require("code-runner.state").get()
+end
+
+-- Detiene SOLO el job del plugin en marcha (el buffer registrado en el
+-- estado). Cerrar/eliminar ese buffer también mata el job de terminal.
+-- Cualquier otra terminal/proceso del usuario queda intacta.
+function M.stop()
+	local terminal = require("code-runner.terminal")
+	local state = require("code-runner.state")
+	local s = state.get()
+
+	if s.status ~= "running" then
+		terminal.notify("No hay ninguna ejecución en marcha para detener", vim.log.levels.WARN)
+		return
+	end
+
+	local buf = s.buf
+
+	if buf and vim.api.nvim_buf_is_valid(buf) then
+		terminal._close_current(buf)
+		terminal.notify(
+			("Ejecución cancelada (%s)"):format(s.action or "acción"),
+			vim.log.levels.INFO
+		)
+		return
+	end
+
+	-- job registrado pero su buffer ya no existe: no hay nada que matar
+	state.set("cancelled")
+	terminal.notify("El job ya no estaba disponible; estado marcado como cancelado", vim.log.levels.WARN)
 end
 
 return M

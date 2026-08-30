@@ -91,14 +91,89 @@ T.it("run_last sin ejecución previa notifica WARN", function()
   T.eq(vim.log.levels.WARN, notified[1].level)
 end)
 
+T.section("init: stop()")
+
+T.it("stop sin ejecución en marcha notifica WARN y no rompe nada", function()
+  local terminal = require "code-runner.terminal"
+  local original_notify = terminal.notify
+  local notified = {}
+  terminal.notify = function(msg, level)
+    table.insert(notified, { msg = msg, level = level })
+  end
+
+  require("code-runner.state").set("idle")
+  cr.stop()
+
+  T.eq(1, #notified, "una sola notificación")
+  T.eq(vim.log.levels.WARN, notified[1].level)
+
+  terminal.notify = original_notify
+end)
+
+T.it("stop cancela el job del plugin y libera su buffer", function()
+  local terminal = require "code-runner.terminal"
+  local state = require "code-runner.state"
+  local save_notify = terminal.notify
+  local notified = {}
+  terminal.notify = function(msg, level)
+    table.insert(notified, { msg = msg, level = level })
+  end
+
+  state.set("idle")
+  terminal.open("echo 'para detener'", "horizontal")
+
+  T.eq("running", state.get().status)
+  local buf = state.get().buf
+  T.truthy(buf and vim.api.nvim_buf_is_valid(buf), "el estado guarda el buffer del job")
+
+  cr.stop()
+
+  T.eq("cancelled", state.get().status, "stop => cancelled")
+  T.falsy(vim.api.nvim_buf_is_valid(buf), "el buffer del job fue liberado (el job murió con él)")
+  T.truthy(#notified >= 1, "confirma la cancelación")
+
+  terminal.notify = save_notify
+end)
+
+T.it("stop no toca terminales externas (solo el buffer registrado)", function()
+  local terminal = require "code-runner.terminal"
+  local state = require "code-runner.state"
+  local save_notify = terminal.notify
+  terminal.notify = function() end
+
+  -- terminal AJENA con su propio job vivo y de larga vida (multiplataforma)
+  local foreign = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(foreign, "foreign_terminal")
+  local foreign_win = vim.api.nvim_get_current_win()
+  vim.api.nvim_win_set_buf(foreign_win, foreign)
+  local sleep_cmd = vim.fn.has "win32" == 1 and "ping -n 300 127.0.0.1" or "sleep 30"
+  vim.fn.termopen(sleep_cmd, { on_exit = function() end })
+
+  state.set("idle")
+  terminal.open("echo 'del plugin'", "horizontal")
+
+  cr.stop()
+
+  T.truthy(vim.api.nvim_buf_is_valid(foreign), "la terminal ajena sigue viva")
+  T.falsy(vim.b[foreign].code_runner_term, "la ajena no lleva el marcador del plugin")
+  T.eq("terminal", vim.bo[foreign].buftype, "sigue siendo una terminal (su job intacto)")
+  T.falsy(
+    vim.fn.fnamemodify(vim.api.nvim_buf_get_name(foreign), ":t") == "code-runner",
+    "su nombre es term://..., nunca code-runner"
+  )
+
+  terminal.notify = save_notify
+end)
+
 T.section("plugin: comandos de usuario")
 
-T.it("registra :CodeRun, :CodeRunLast y :CodeRunHistory", function()
+T.it("registra :CodeRun, :CodeRunLast, :CodeRunHistory y :CodeRunStop", function()
   dofile(PLUG_ROOT .. "/plugin/code-runner.lua")
   local cmds = vim.api.nvim_get_commands {}
   T.truthy(cmds.CodeRun, ":CodeRun registrado")
   T.truthy(cmds.CodeRunLast, ":CodeRunLast registrado")
   T.truthy(cmds.CodeRunHistory, ":CodeRunHistory registrado")
+  T.truthy(cmds.CodeRunStop, ":CodeRunStop registrado")
 end)
 
 T.it("el guard evita doble registro", function()

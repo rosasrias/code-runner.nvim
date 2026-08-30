@@ -18,6 +18,7 @@ T.it("la lista de estados incluye running, success, failed y cancelled", functio
 end)
 
 T.it("arranca en idle con campos vacíos", function()
+  state.set("idle") -- estado global compartido con otros specs
   local s = state.get()
   T.eq("idle", s.status)
   T.eq(nil, s.action)

@@ -8,8 +8,9 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       failed|cancelled`) + `state()` API. Alimentado por `terminal.open`/`_on_exit`;
       `run_id` evita que on_exit de jobs viejos pisen el estado actual. Incluye
       fix E95 (reuso de buffer terminal) y `cancelled` al cerrar con `q`.
-- [ ] **`:CodeRunStop`**: usar el buffer/job actual (último `run_id`) y matarlo
-      via `buf_delete` forzado (`_close_current` ya lo hace; exponer el job id).
+- [x] **`:CodeRunStop`**: `init.stop()` mata SOLO el buffer registrado en el
+      estado (via `_close_current`); terminales ajenas intactas. Comando
+      `:CodeRunStop`.
 - [ ] **`:CodeRunRestart`**: combinar stop + re-ejecutar última acción.
 - [ ] **Run Last robusto**: persistir última acción (JSON en
       `stdpath("data")/code-runner/` junto a history, o usar el tope del
