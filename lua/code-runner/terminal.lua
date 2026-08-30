@@ -73,6 +73,10 @@ function M.open(cmd, direction, cwd)
     opts.cwd = cwd
   end
 
+  opts.on_exit = function(_, code)
+    require("code-runner.quickfix").handle(buf, code, cwd)
+  end
+
   vim.fn.termopen(command, opts)
   vim.cmd "startinsert"
 end
