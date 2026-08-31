@@ -6,6 +6,7 @@
 local config = require "code-runner.config"
 local terminal = require "code-runner.terminal"
 local catalog = require "code-runner.actions.catalog"
+local registry = require "code-runner.actions.registry"
 local java = require "code-runner.actions.java"
 
 local M = {}
@@ -24,6 +25,10 @@ function M.get_actions()
       actions[ext] = vim.tbl_extend("force", actions[ext] or {}, user_actions)
     end
   end
+
+  -- Action registry (register_action): prioridad máxima sobre built-ins y
+  -- config cruda. Aplica labels con icono según `kind`.
+  actions = registry.apply(actions, config.options.icons)
 
   -- Alias para R (los scripts suelen usar extensión mayúscula)
   if actions.r then

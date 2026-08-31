@@ -60,6 +60,25 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## P1 · Action registry + register_action
+
+- Nuevo `actions/registry.lua`: registrar/sobrescribir/deshabilitar acciones
+  por lenguaje de forma programática.
+  ```lua
+  require("code-runner").register_action {
+    id = "mytool", filetypes = { "py" }, kind = "run", command = "mytool %",
+  }
+  ```
+  - `kind` run|build|test|misc determina el icono del label del picker.
+  - `command` (string sustituible) o `run` (función).
+  - `name` (opcional) personaliza el label; default = `id`.
+  - `disable=true` elimina el lenguaje del catálogo.
+  - `unregister_action(id)` y `list_registered_actions()`.
+- Se aplica en `actions.get_actions()` como override de máxima prioridad
+  (built-in < config.options.actions < registry).
+- API en `require("code-runner")`: `register_action` / `unregister_action` /
+  `list_registered_actions`. **181 tests verdes.**
+
 ## Refactor de arquitectura: modularización (módulos <= ~300 líneas)
 
 - Regla nueva (AGENTS.md/ARCHITECTURE): ningún archivo supera ~300 líneas.

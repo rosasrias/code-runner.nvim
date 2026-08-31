@@ -17,6 +17,7 @@ require("code-runner").setup {}
 dofile(plug_root .. "/tests/config_spec.lua")
 dofile(plug_root .. "/tests/shell_spec.lua")
 dofile(plug_root .. "/tests/actions_spec.lua")
+dofile(plug_root .. "/tests/registry_spec.lua")
 dofile(plug_root .. "/tests/init_spec.lua")
 dofile(plug_root .. "/tests/picker_spec.lua")
 dofile(plug_root .. "/tests/context_spec.lua")

@@ -43,7 +43,11 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 
 ## P1 — siguiente
 
-- [ ] Action registry + `register_action` (id, filetypes, kind, command/run).
+- [x] **Action registry + `register_action`**: `actions/registry.lua` +
+      API pública `register_action{id, filetypes, kind, name, command|run}` /
+      `unregister_action` / `list_registered_actions`. `kind` run|build|test|misc
+      (icono del label), `disable=true` elimina el lenguaje. Se aplica sobre el
+      catálogo como override de máxima prioridad en `actions.lua`.
 - [ ] API pública `code-runner.run/run_last/stop/restart/state/context`.
 - [ ] `.code-runner.lua` por proyecto (load seguro, defaults, tasks).
 - [ ] Profiles Run/Build/Test/Debug/Release/Benchmark donde apliquen.

@@ -48,6 +48,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `config.lua` | Defaults + merge de `opts` |
 | `actions.lua` | Ensambla el catálogo + overrides de usuario + alias R + orden |
 | `actions/{catalog,java,latex,languages/*}` | Catálogo por grupos (compilados/script) y helpers Java/LaTeX |
+| `actions/registry.lua` | Action registry (P1): `register_action`/`unregister`/`list` |
 | `context.lua` | API `detect()` con cache + acción contextual "Run test" |
 | `context/{test,entry}.lua` | Detección de test bajo el cursor; entry points (main) TS/regex |
 | `project.lua` | Raíz del proyecto por marcadores por lenguaje + genéricos |

@@ -251,4 +251,24 @@ function M.state()
 	return require("code-runner.state").get()
 end
 
+-- Registra una acción programática para uno o varios lenguajes (P1).
+--   register_action{
+--     id = "mytool", filetypes = {"py"}, kind = "run", command = "mytool %"
+--   }
+--   kind: run|build|test|misc (icono del label). command o run (función).
+--   Sobrescribir el mismo id reemplaza; `disable=true` elimina el lenguaje.
+function M.register_action(spec)
+	return require("code-runner.actions.registry").register(spec)
+end
+
+-- Desregistra una acción registrada con register_action().
+function M.unregister_action(id)
+	require("code-runner.actions.registry").unregister(id)
+end
+
+-- Lista las acciones del registry (id -> spec).
+function M.list_registered_actions()
+	return require("code-runner.actions.registry").list()
+end
+
 return M
