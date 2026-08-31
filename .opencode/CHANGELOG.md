@@ -2,6 +2,17 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P2 · `:checkhealth code-runner`
+
+- Nuevo `health.lua`: diagnostica core (config/canal de errores) y la
+  disponibilidad de las herramientas reales de las acciones.
+- Las herramientas se **derivan** del catálogo resuelto (primer token de cada
+  `command` string; ignora `$vars` y rutas: `cargo`, `go`, `mvn`, `dotnet`...)
+  y solo se revisan para los **lenguajes que el usuario usa** (historial +
+  buffer actual): un toolchain no instalado no es error si no se ha usado.
+  `glow` se reporta como recomendada para preview de Markdown.
+- +5 tests (derivación). Total: **212 tests verdes**.
+
 ## P2 · Canal de errores `vim.diagnostic` (elegible)
 
 - `quickfix.style` ahora es `"quickfix"` (default) | `"diagnostic"` | `"both"`.

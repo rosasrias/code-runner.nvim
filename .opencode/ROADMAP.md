@@ -28,7 +28,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 ## P2 — Integraciones y pulido
 
 - [x] `vim.diagnostic` para errores de build/test (manteniendo Quickfix; elegible) — nuevo `quickfix.style` (`quickfix`/`diagnostic`/`both`) + módulo `diagnostics.lua`
-- [ ] `:checkhealth code-runner` — requiere/opcional/recomendada por herramienta; distingue lo que el usuario no usa
+- [x] `:checkhealth code-runner` — requiere/opcional/recomendada: deriva las herramientas del catálogo resuelto y solo revisa los lenguajes que el usuario usa (historial + buffer actual); `glow` va como recomendada para markdown
 - [ ] Events `CodeRunnerStart/Exit/Success/Failed/Cancelled` (solo los que aportan valor)
 - [ ] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes
 - [ ] Mejoras Windows restantes (quoting, msbuild, etc.)

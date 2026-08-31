@@ -35,8 +35,8 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   robusto con persistencia, `shell.lua` quote-aware, cache de contexto, cleanup
   de temporales Java) y fase **P1 completa** (action registry + `register_action`,
   API pública, `.code-runner.lua`, custom tasks con variables de contexto y
-  profiles opt-in). **P2 en curso**: diagnóstico de errores vía `vim.diagnostic`
-  elegible hecho; falta checkhealth/events/wrappers/Windows — ver
+  profiles opt-in). **P2 en curso**: canal `vim.diagnostic` elegible y
+  `:checkhealth code-runner` hechos; falta events/wrappers/Windows — ver
   `.opencode/ROADMAP.md`.
 
 ## Arquitectura (resumen)
@@ -61,6 +61,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `terminal/{buffer,ui}.lua` | Identificación de buffers; ventana/título/autoclose |
 | `quickfix.lua` | Parseo de salida → lista quickfix (`:cn`/`:cp`), auto-close en éxito |
 | `diagnostics.lua` | Canal alternativo de errores → `vim.diagnostic` (namespace propio, P2) |
+| `health.lua` | `:checkhealth` — deriva herramientas del catálogo y revisa las usadas (P2) |
 | `history.lua` | Persistencia en `stdpath("data")/code-runner/history.json` |
 | `last.lua` | Última ejecución persistida para `run_last`/`restart` entre sesiones |
 | `picker.lua` | Selector volt con fallback `vim.ui.select` |

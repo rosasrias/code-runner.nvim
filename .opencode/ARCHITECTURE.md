@@ -16,6 +16,7 @@ lua/code-runner/
 ├── terminal.lua   Ciclo de vida del job: open/_on_exit/_close_current/_exit_hint, notify
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
 ├── diagnostics.lua Canal de errores alternativo → vim.diagnostic (namespace propio)
+├── health.lua      :checkhealth — deriva herramientas del catálogo, revisa lo usado
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
 ├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
@@ -129,6 +130,17 @@ y las asigna agrupadas por buffer bajo un **namespace propio** (`code-runner`).
 Con exit `0` (éxito) limpia todos los del namespace; nunca toca los de otros
 plugins. Las entradas sin filename (`--- FAIL:`) no tienen búfer → se
 descartan.
+
+## Health (:checkhealth, P2)
+
+`health.lua` no mantiene un mapa manual lenguaje→tool (se desincroniza): las
+herramientas se **derivan** del catálogo resuelto tomando el primer token de
+cada `command` string (`cargo`, `go`, `mvn`, `dotnet`, ...), ignorando `$vars`
+(`$binRun`, `$fileBase`) y rutas con separador (no son del PATH). Para no
+marcar como error lo que el usuario nunca usó, **solo revisa los lenguajes
+usados** = union(historial keys, key del buffer actual). `glow` (preview md) va
+como recomendada. Se auto-descubre por el nombre `health.lua` → `:checkhealth
+code-runner`.
 
 ## Estado central (state.lua)
 

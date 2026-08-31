@@ -81,7 +81,10 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       Nuevo `quickfix.style` (`quickfix`|`diagnostic`|`both`) + módulo
       `diagnostics.lua` (namespace propio `code-runner`, solo limpia lo suyo,
       base 0, agrupa por buffer). Default sigue siendo quickfix.
-- [ ] `:checkhealth code-runner`.
+- [x] `:checkhealth code-runner`. `health.lua`: deriva los binarios de las
+      acciones del catálogo resuelto (primer token de cada `command` string,
+      ignora `$vars`/rutas) y revisa solo los lenguajes usados (historial +
+      buffer actual). `glow` como recomendada para markdown.
 - [ ] Events `CodeRunner*`.
 - [ ] Maven/Gradle Wrapper (`mvnw`, `./gradlew`).
 - [ ] Windows restante (quoting/msbuild).
