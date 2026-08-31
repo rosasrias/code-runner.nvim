@@ -92,10 +92,58 @@ function M.substitute(cmd, vars, key)
   end))
 end
 
+-- Divide por el operador `&&` SOLO cuando está fuera de comillas. vim.split
+-- naive corta también un `&&` literal dentro de "..." o '...' (p.ej. el
+-- argumento de un comando), rompiendo la reescritura para PowerShell.
+-- Devuelve la lista de trozos (sin los separadores).
+local function split_and_outside_quotes(cmd)
+  local parts = {}
+  local buf = {}
+  local quote = nil -- nil | "'" | '"'
+  local i = 1
+  local n = #cmd
+
+  local function flush()
+    table.insert(parts, table.concat(buf))
+    buf = {}
+  end
+
+  while i <= n do
+    local c = cmd:sub(i, i)
+
+    if quote then
+      if c == "\\" and quote == '"' then
+        table.insert(buf, c)
+        table.insert(buf, cmd:sub(i + 1, i + 1))
+        i = i + 1
+      elseif c == quote then
+        quote = nil
+        table.insert(buf, c)
+      else
+        table.insert(buf, c)
+      end
+      i = i + 1
+    elseif c == "'" or c == '"' then
+      quote = c
+      table.insert(buf, c)
+      i = i + 1
+    elseif c == "&" and cmd:sub(i + 1, i + 1) == "&" then
+      flush()
+      i = i + 2
+    else
+      table.insert(buf, c)
+      i = i + 1
+    end
+  end
+
+  flush()
+  return parts
+end
+
 function M.wrap_command(cmd)
   if M.IS_WIN then
     if cmd:find("&&", 1, true) then
-      local parts = vim.split(cmd, "&&", { plain = true })
+      local parts = split_and_outside_quotes(cmd)
       local chained = vim.trim(parts[#parts])
 
       for i = #parts - 1, 1, -1 do

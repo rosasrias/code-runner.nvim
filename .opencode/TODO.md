@@ -17,10 +17,9 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - [x] **Run Last robusto**: `last.lua` persiste la última elección en
       `stdpath("data")/code-runner/last.json`; `setup` la recarga (`last_choice`
       pasa a ser cache en memoria). Ocultable con `last_run.persist=false`.
-- [ ] **shell.lua**: evaluar `wrap_command`; si el comando contiene `&&`
-      dentro de comillas la partición actual se rompe. Decidir entre tokenizar
-      con respeto a quoting o pasar el chain completo a PowerShell/bash.
-      Cubrir con tests (`shell_spec`).
+- [x] **shell.lua**: `wrap_command` ahora usa un splitter quote-aware: solo
+      convierte `&&` fuera de comillas; un `&&` literal dentro de `"..."`/
+      `'...'` ya no se reescribe (rompía strings al pasarlos a PowerShell).
 - [ ] **Cache de contexto**: en `context.detect`, cache por
       `{ bufnr, changedtick, cursor, key }`; invalidar por changedtick/cursor.
       TS parse sin re-parseear cada llamada.

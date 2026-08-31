@@ -150,3 +150,5 @@ decoración.
    run-last robusto en P0.
 6. **Windows = ciudadano de primera** (PowerShell, `.exe`, rutas con espacios).
 7. **Tests propios** (runner.lua) sin framework externo + E2E con compilación real.
+8. **`wrap_command` quote-aware**: divide `&&` solo fuera de comillas (al pasar
+   cadenas con `&&` literal a PowerShell no se corrompen).

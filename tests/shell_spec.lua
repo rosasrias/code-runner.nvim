@@ -106,6 +106,26 @@ T.it("quoted_run usa & en Windows (bug de PowerShell)", function()
   shell.IS_WIN = IS_WIN_BACKUP
 end)
 
+T.it("&& literal dentro de comillas no se convierte (no rompe strings)", function()
+  shell.IS_WIN = true
+  local argv = shell.wrap_command('echo "a && b"')
+  T.eq('echo "a && b"', argv[#argv], "&& dentro de \"...\" queda intacto")
+end)
+
+T.it("&& dentro de comillas simples tampoco se convierte", function()
+  shell.IS_WIN = true
+  local argv = shell.wrap_command("echo 'a && b'x")
+  T.eq("echo 'a && b'x", argv[#argv])
+end)
+
+T.it("mezcla: && fuera convierte, dentro de comillas no", function()
+  shell.IS_WIN = true
+  local argv = shell.wrap_command('set MSG="a && b" && echo %MSG%')
+  local out = argv[#argv]
+  T.contains(out, "; if ($?) { echo %MSG% }", "el && real se convierte")
+  T.contains(out, '"a && b"', "el && literal del valor queda")
+end)
+
 T.section("shell: bin_run()")
 
 -- Fixture con archivo DENTRO del cwd => %:r es relativo

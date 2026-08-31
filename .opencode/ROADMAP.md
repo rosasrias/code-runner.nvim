@@ -13,7 +13,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] `:CodeRunStop` — cancelar el proceso activo del plugin (nunca procesos ajenos)
 - [x] `:CodeRunRestart` — detener y re-ejecutar la última acción
 - [x] Run Last robusto — `last_choice` se persiste (last.json) y se recarga en `setup`; `last_choice` en memoria queda como cache
-- [ ] Revisar `shell.lua` — `wrap_command` parte `cmd` por `&&` con `vim.split` (naive); no romper `&&` dentro de comillas; estructuras de comandos donde haga falta
+- [x] Revisar `shell.lua` — `wrap_command` respeta `&&` dentro de comillas (splitter quote-aware; `vim.split` naive lo rompía)
 - [ ] Cache de contexto — `buffer + changedtick + cursor + filetype` para TS/test/main
 - [ ] Cleanup de temporales Java (directorio `tempname()` generado por smart run)
 

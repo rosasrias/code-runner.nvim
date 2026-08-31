@@ -60,6 +60,14 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## shell.lua: wrap_command respeta `&&` dentro de comillas
+
+- `vim.split(cmd, "&&", { plain = true })` partía también un `&&` literal
+  dentro de `"..."`/`'...'`, reescribiéndolo mal para PowerShell y corrompiendo
+  strings per se (p.ej. un argumento `"a && b"`). Nuevo `split_and_outside_quotes`
+  (tokenizer con estado de comillas, incl. escapes `\"`) que solo divide en `&&`
+  fuera de comillas. +3 tests (wrap_command).
+
 ## 33ec363 — Quickfix se cierra y vacía sola en éxito
 
 - `quickfix.close_on_success` (default `true`): al re-ejecutar con éxito la
