@@ -53,7 +53,14 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       register_action / unregister_action / list_registered_actions`.
       `context(key)` detecta el contexto del archivo (key opcional, default a
       la extensión/filetype del buffer).
-- [ ] `.code-runner.lua` por proyecto (load seguro, defaults, tasks).
+- [x] **`.code-runner.lua` por proyecto**: `projectrc.lua` lo carga desde la
+      raíz del proyecto (cacheado por raíz, `pcall` seguro). Puede llamar a la
+      API (`require("code-runner").register_action{...}`) o devolver
+      `return { tasks = { name = { filetypes, kind, command } } }` (se registran
+      vía registry). Se carga al correr, antes de construir el catálogo.
+      `projectrc.enabled=false` lo desactiva; `projectrc.clear_cache()` para
+      reiniciar/cache.
+- [ ] Custom tasks (`tasks.dev/build/test`) con variables de contexto.
 - [ ] Profiles Run/Build/Test/Debug/Release/Benchmark donde apliquen.
 
 ## P2 — después

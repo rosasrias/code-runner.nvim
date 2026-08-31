@@ -60,6 +60,19 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## P1 · `.code-runner.lua` por proyecto
+
+- Nuevo `projectrc.lua`: carga `.code-runner.lua` desde la raíz del proyecto
+  (mismo root de `project.resolve`), cacheado por raíz y con `pcall` seguro.
+- El dotfile puede:
+  - llamar a la API: `require("code-runner").register_action{...}`; o
+  - devolver tasks: `return { tasks = { name = { filetypes, kind, command } } }`
+    (se registran vía el registry, máxima prioridad).
+- Se carga en `build_run` antes de construir el catálogo → las tasks del
+  proyecto aparecen en el picker de ese proyecto.
+- Opción `projectrc.enabled` (default true) y `projectrc.clear_cache()`.
+- **188 tests verdes.**
+
 ## P1 · API pública completa
 
 - `require("code-runner")` expone ya: `run` (alias de `build_run`),

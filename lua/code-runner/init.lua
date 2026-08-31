@@ -95,6 +95,14 @@ function M.build_run()
 	local terminal = require("code-runner.terminal")
 	local context = require("code-runner.context")
 
+	-- Carga `.code-runner.lua` del proyecto (tasks) ANTES de construir el
+	-- catálogo, para que sus acciones estén disponibles en el picker.
+	local rc_key = vim.fn.expand("%:e")
+	if rc_key == "" then
+		rc_key = vim.bo.filetype
+	end
+	require("code-runner.projectrc").load(rc_key)
+
 	local entry, key = build_entry(actions.get_actions(), terminal)
 
 	if not entry then

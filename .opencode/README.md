@@ -52,6 +52,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `context.lua` | API `detect()` con cache + acción contextual "Run test" |
 | `context/{test,entry}.lua` | Detección de test bajo el cursor; entry points (main) TS/regex |
 | `project.lua` | Raíz del proyecto por marcadores por lenguaje + genéricos |
+| `projectrc.lua` | Carga `.code-runner.lua` del proyecto (tasks) con pcall y cache por raíz |
 | `terminal.lua` | Ciclo de vida del job: open/`_on_exit`/stop/cleanup + notify |
 | `terminal/{buffer,ui}.lua` | Identificación de buffers; ventana/título/autoclose |
 | `quickfix.lua` | Parseo de salida → lista quickfix (`:cn`/`:cp`), auto-close en éxito |

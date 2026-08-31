@@ -83,6 +83,11 @@ M.defaults = {
     -- una sesión nueva de Neovim). Si no, solo vive en memoria.
     persist = true,
   },
+  projectrc = {
+    -- Cargar `.code-runner.lua` desde la raíz del proyecto (tasks por
+    -- proyecto; carga segura y cacheada por raíz). false lo desactiva.
+    enabled = true,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)
