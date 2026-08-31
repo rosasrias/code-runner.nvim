@@ -167,4 +167,46 @@ function M.wrap_command(cmd)
   return { "bash", "-lc", cmd }
 end
 
+-- Maven/Gradle Wrapper: `mvn`/`gradle` como primer token → `mvnw`/`gradlew`
+-- del proyecto, si el wrapper existe en `cwd`. Es independente de la shell:
+-- en Windows los wrappers son `mvnw.cmd`/`gradlew.bat`; en POSIX `mvnw`/
+-- `gradlew`. Si no hay wrapper (o no es el primer token) devuelve el comando
+-- intacto.
+local WRAPPERS = {
+  mvn = {
+    [true] = { file = "mvnw.cmd", invoke = ".\\mvnw.cmd" },
+    [false] = { file = "mvnw", invoke = "./mvnw" },
+  },
+  gradle = {
+    [true] = { file = "gradlew.bat", invoke = ".\\gradlew.bat" },
+    [false] = { file = "gradlew", invoke = "./gradlew" },
+  },
+}
+
+function M.use_wrappers(cmd, cwd)
+  if type(cmd) ~= "string" then
+    return cmd
+  end
+
+  local first = cmd:match "^%s*([^%s]+)"
+
+  if not first then
+    return cmd
+  end
+
+  local spec = WRAPPERS[first]
+
+  if not spec or not cwd or cwd == "" then
+    return cmd
+  end
+
+  local plat = spec[M.IS_WIN]
+
+  if vim.fn.filereadable(cwd .. "/" .. plat.file) ~= 1 then
+    return cmd
+  end
+
+  return cmd:gsub("^%s*" .. first .. "%s*", plat.invoke .. " ", 1)
+end
+
 return M

@@ -30,7 +30,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] `vim.diagnostic` para errores de build/test (manteniendo Quickfix; elegible) — nuevo `quickfix.style` (`quickfix`/`diagnostic`/`both`) + módulo `diagnostics.lua`
 - [x] `:checkhealth code-runner` — requiere/opcional/recomendada: deriva las herramientas del catálogo resuelto y solo revisa los lenguajes que el usuario usa (historial + buffer actual);   `glow` va como recomendada para markdown
 - [x] Events `CodeRunnerStart/Exit/Success/Failed/Cancelled` — autocmds User emitidos desde `state.lua` (un solo punto), opt-out con `events.enabled`; `Exit` cubre cualquier estado final
-- [ ] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes
+- [x] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes — `shell.use_wrappers` en `terminal.open` (usa `cwd`); la auto-run de Java pasa el dir del pom como cwd
 - [ ] Mejoras Windows restantes (quoting, msbuild, etc.)
 
 ## P3 — Task engine

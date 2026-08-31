@@ -22,7 +22,7 @@ lua/code-runner/
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
 ├── events.lua     Autocmds User CodeRunner* emitidos desde state.set
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
-├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
+├── shell.lua      Sustitución de variables + wrapping PowerShell/bash + wrappers Maven/Gradle
 ├── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
 │
 ├── actions/
@@ -152,6 +152,17 @@ estado final dispara además `CodeRunnerExit`. Emite con
 `vim.api.nvim_exec_autocmds("User", ...)` con
 `data = { status, action, cwd, filetype, buf, code }`. Opt-out con
 `events.enabled=false`. `idle` y `state.reset()` no emiten.
+
+## Maven/Gradle Wrapper (P2)
+
+`shell.use_wrappers(cmd, cwd)` reemplaza el primer token `mvn`/`gradle` por el
+wrapper del proyecto si el archivo existe en `cwd` (`mvnw`/`mvnw.cmd`,
+`gradlew`/`gradlew.bat` según `shell.IS_WIN`, invocado con `./`/`.\`). Si no
+hay wrapper (o no es `mvn`/`gradle`) devuelve el comando intacto. Se aplica en
+`terminal.open` con el `cwd` del proyecto → cubre cualquier acción string que
+arranque con `mvn`/`gradle` sin tocarlas. La auto-run de Java (`java.maven_run`)
+pasa `pom_dir` como `cwd` (sustituye el `cd`/`Set-Location` a mano). Opt-out
+con `wrappers.enabled=false`.
 
 ## Estado central (state.lua)
 

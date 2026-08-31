@@ -156,6 +156,13 @@ end
 -- cleanup (opcional): lista de rutas a borrar al terminar el job.
 function M.open(cmd, direction, cwd, label, cleanup)
   direction = direction or config.options.terminal.direction
+
+  -- Maven/Gradle Wrapper (proyecto): `mvn`→`mvnw`, `gradle`→`gradlew` si el
+  -- wrapper existe en el cwd. No cambia nada si no hay wrapper.
+  if config.options.wrappers.enabled then
+    cmd = shell.use_wrappers(cmd, cwd)
+  end
+
   local command = shell.wrap_command(cmd)
 
   -- Key resuelta del archivo del usuario ANTES de cambiar la ventana actual

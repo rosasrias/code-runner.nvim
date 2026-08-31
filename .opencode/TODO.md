@@ -90,7 +90,12 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       `CodeRunnerFailed`/`CodeRunnerCancelled` y `CodeRunnerExit` (todo estado
       final). Opt-out con `events.enabled`. Payload via `vim.api.nvim_exec_autocmds`
       (status/action/cwd/filetype/buf/code).
-- [ ] Maven/Gradle Wrapper (`mvnw`, `./gradlew`).
+- [x] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`).
+      `shell.use_wrappers(cmd, cwd)` reemplaza el primer token `mvn`/`gradle`
+      por el wrapper del proyecto si existe (`mvnw`/`mvnw.cmd`, `gradlew`/
+      `gradlew.bat` según plataforma); `terminal.open` lo aplica con `cwd`; la
+      auto-run de Java pasa el dir del pom como `cwd` (antes hacía cd a mano).
+      Opt-out con `wrappers.enabled`. Marcadores gradle ya estaban.
 - [ ] Windows restante (quoting/msbuild).
 
 ## Notas

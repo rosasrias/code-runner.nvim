@@ -106,6 +106,12 @@ M.defaults = {
     -- false los desactiva por completo.
     enabled = true,
   },
+  wrappers = {
+    -- Maven/Gradle Wrapper: si existe `./mvnw` (o `mvnw.cmd`) / `./gradlew`
+    -- (o `gradlew.bat`) en la raíz del proyecto, usarlo en vez del `mvn`/
+    -- `gradle` global. No hace nada si el wrapper no está presente.
+    enabled = true,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

@@ -36,8 +36,8 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   de temporales Java) y fase **P1 completa** (action registry + `register_action`,
   API pública, `.code-runner.lua`, custom tasks con variables de contexto y
   profiles opt-in). **P2 en curso**: canal `vim.diagnostic` elegible,
-  `:checkhealth code-runner` y events `CodeRunner*` hechos; falta
-  wrappers/Windows — ver `.opencode/ROADMAP.md`.
+  `:checkhealth code-runner`, events `CodeRunner*` y Maven/Gradle Wrapper
+  hechos; falta Windows restante — ver `.opencode/ROADMAP.md`.
 
 ## Arquitectura (resumen)
 
@@ -66,7 +66,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `history.lua` | Persistencia en `stdpath("data")/code-runner/history.json` |
 | `last.lua` | Última ejecución persistida para `run_last`/`restart` entre sesiones |
 | `picker.lua` | Selector volt con fallback `vim.ui.select` |
-| `shell.lua` | Sustitución de variables y wrapping PowerShell/bash |
+| `shell.lua` | Sustitución de variables, wrapping PowerShell/bash y wrappers Maven/Gradle (P2) |
 | `highlight.lua` | Grupos propios `CodeRunner*` (defaults enlazados al tema) |
 
 Entrada: `plugin/code-runner.lua` define `:CodeRun`, `:CodeRunLast`,

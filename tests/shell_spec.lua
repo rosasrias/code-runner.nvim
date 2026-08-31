@@ -225,3 +225,56 @@ T.it("substitute + wrap_command ejecuta y produce salida correcta", function()
   T.eq(0, vim.v.shell_error, "código de salida 0")
   T.contains(out, marker)
 end)
+
+T.section("shell: use_wrappers() Maven/Gradle Wrapper")
+
+local wdir = vim.fn.tempname()
+vim.fn.mkdir(wdir, "p")
+
+T.it("sin wrapper en el cwd devuelve el comando intacto", function()
+  shell.IS_WIN = IS_WIN_BACKUP
+  T.eq("mvn -q clean package", shell.use_wrappers("mvn -q clean package", wdir))
+  T.eq("gradle build", shell.use_wrappers("gradle build", wdir))
+end)
+
+T.it("no es mvn/gradle: intacto aunque exista mvnw", function()
+  vim.fn.writefile({ "@echo off" }, wdir .. "/mvnw.cmd")
+  T.eq("go test", shell.use_wrappers("go test", wdir))
+end)
+
+T.it("Unix con ./mvnw: mvn → ./mvnw", function()
+  vim.fn.writefile({ "#!/bin/sh" }, wdir .. "/mvnw")
+  shell.IS_WIN = false
+  T.eq("./mvnw -q clean package", shell.use_wrappers("mvn -q clean package", wdir))
+  shell.IS_WIN = IS_WIN_BACKUP
+end)
+
+T.it("Windows con mvnw.cmd: mvn → .\\mvnw.cmd", function()
+  vim.fn.writefile({ "@echo off" }, wdir .. "/mvnw.cmd")
+  shell.IS_WIN = true
+  T.eq(".\\mvnw.cmd -q clean package", shell.use_wrappers("mvn -q clean package", wdir))
+  shell.IS_WIN = IS_WIN_BACKUP
+end)
+
+T.it("gradlew: gradle → .\\gradlew.bat en Windows", function()
+  vim.fn.writefile({ "@echo off" }, wdir .. "/gradlew.bat")
+  shell.IS_WIN = true
+  T.eq(".\\gradlew.bat build", shell.use_wrappers("gradle build", wdir))
+  shell.IS_WIN = IS_WIN_BACKUP
+end)
+
+T.it("otro cwd sin wrappers devuelve intacto (solo mira en el cwd dado)", function()
+  -- "other" es un dir aparte: aunque wdir tenga mvnw.cmd, aquí no aplica
+  local other = vim.fn.tempname()
+  vim.fn.mkdir(other, "p")
+  shell.IS_WIN = true
+  T.eq("mvn clean", shell.use_wrappers("mvn clean", other))
+  T.eq("gradle build", shell.use_wrappers("gradle build", other))
+  shell.IS_WIN = IS_WIN_BACKUP
+end)
+
+T.it("cwd vacío/nil no rompe y no sustituye", function()
+  T.eq("mvn test", shell.use_wrappers("mvn test", nil))
+  T.eq("mvn test", shell.use_wrappers("mvn test", ""))
+  T.eq("mvn test", shell.use_wrappers("mvn test"))
+end)

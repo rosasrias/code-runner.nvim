@@ -2,6 +2,18 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P2 · Maven/Gradle Wrapper
+
+- `shell.use_wrappers(cmd, cwd)`: si existe `mvnw`/`mvnw.cmd` o
+  `gradlew`/`gradlew.bat` en el cwd del proyecto, reemplaza el primer token
+  `mvn`/`gradle` por el wrapper (punto→`.\mvnw.cmd`/`.\gradlew.bat`,
+  posix→`./mvnw`/`./gradlew`). No toca el comando si no hay wrapper.
+- `terminal.open` lo aplica con el `cwd` del proyecto (así cubre todas las
+  acciones string: `mvn -q clean package`, `mvn spring-boot:run`, ...).
+- La auto-run de Java ahora pasa el dir del pom como `cwd` y suelta el
+  `Set-Location`/`cd` manual → el wrapper `mvnw` se detecta ahí también.
+- Opt-out con `wrappers.enabled=false`. +7 tests. Total: **225 tests verdes**.
+
 ## P2 · Events `CodeRunner*`
 
 - Autocmds User emitidos desde `state.lua` (un solo punto por transición, no

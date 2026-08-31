@@ -1,6 +1,5 @@
 -- Ejecución de Java sin Maven/Gradle (smart run) y auto-detección de Maven.
 local terminal = require "code-runner.terminal"
-local shell = require "code-runner.shell"
 
 local notify = terminal.notify
 
@@ -141,10 +140,10 @@ function M.maven_run()
     return
   end
 
-  local cd_cmd = shell.IS_WIN and string.format('Set-Location "%s"', pom_dir) or string.format("cd '%s'", pom_dir)
+  -- Se corre con cwd = directorio del pom (así el wrapper `mvnw` se detecta
+  -- ahí) y el comando es `mvn`/`mvnw` según el proyecto.
   local mvn_cmd = string.format('mvn -q exec:java "-Dexec.mainClass=%s"', full_class)
-
-  terminal.open(cd_cmd .. " && " .. mvn_cmd)
+  terminal.open(mvn_cmd, nil, pom_dir)
 end
 
 return M
