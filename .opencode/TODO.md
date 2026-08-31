@@ -65,7 +65,15 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       contexto `$testName`, `$entry` (fqcn o name) y `$entryLine` derivadas del
       cctx detectado, sustituidas en `command` aunque no sean la acción contextual
       de test. `run_last`/`restart` persisten y reproducen esas vars.
-- [ ] Profiles Run/Build/Test/Debug/Release/Benchmark donde apliquen.
+- [x] Profiles (Presets: Rust `--release`, Go `-bench`, C/C++ `-O2`): opt-in
+      (`profiles.enabled=false`, zero-config). `actions/profiles.lua` devuelve
+      las variantes por lenguaje; se aplican al catálogo al nivel built-in (el
+      usuario/registry pueden sobrescribirlas). Solo lenguajes con un modo real.
+
+## P1 — completo
+
+- Los 5 ítems P1 del ROADMAP están terminados (registry, API, projectrc,
+  custom tasks con vars, profiles). Pasar a P2.
 
 ## P2 — después
 

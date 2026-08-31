@@ -26,6 +26,7 @@ lua/code-runner/
 │   ├── catalog.lua     Construye la tabla `actions` agregando los grupos
 │   ├── java.lua        Smart run de Java (sin Maven) + auto-detección de Maven
 │   ├── latex.lua       Acciones de LaTeX (detectar main, build/ver/limpiar)
+│   ├── profiles.lua    Presets de perfiles opt-in (release/benchmark)
 │   └── languages/
 │       ├── compiled.lua  Lenguajes compilados (nativo C/C++/..., go, rust, kt...)
 │       └── script.lua    Lenguajes interpretados/scripting (py, js, lua, ...)
@@ -78,6 +79,15 @@ plugin/code-runner.lua → init.build_run
 `:CodeRunLast` re-ejecuta `last_choice` (cache en memoria, recargado desde
 `last.json` al arrancar). `:CodeRunHistory` → picker sobre `history.list()` →
 re-ejecuta.
+
+## Profiles (P1)
+
+`actions/profiles.lua` expone `for_lang(env, key)` → tabla de acciones extra o
+`nil`, con presets concretos donde la herramienta tiene un modo real: Rust
+`--release`, Go `-bench`, C/C++ `-O2`. Es **opt-in** (`profiles.enabled=false`):
+`actions.lua` solo las aplica al catálogo si está activado, al nivel built-in
+(así el usuario/registry pueden sobrescribirlas). No hay motor genérico de
+perfiles: sin esto, el picker del zero-config no gana variantes.
 
 ## Terminal
 

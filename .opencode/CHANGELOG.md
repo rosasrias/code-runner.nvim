@@ -2,6 +2,19 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P1 · Profiles (presets opt-in)
+
+- Nuevo `actions/profiles.lua`: variantes de perfil para lenguajes con un modo
+  real, aplicadas al catálogo al nivel built-in (el usuario/registry pueden
+  sobrescribirlas):
+  - **Rust**: `cargo build --release` y `cargo run --release`.
+  - **Go**: `go test -bench . -benchmem`.
+  - **C/C++**: compilar y compile&run con `-O2` (release).
+- **Opt-in**: `profiles.enabled=false` por defecto → el picker del zero-config
+  no cambia. Se activa con `profiles.enabled=true`. No hay motor genérico de
+  perfiles: solo presets donde la herramienta difiere de verdad.
+- **Fase P1 completa.** +7 tests (profiles). Total: **201 tests verdes**.
+
 ## P1 · Custom tasks con variables de contexto
 
 - Las acciones y tasks (incl. las definidas en `.code-runner.lua`) reciben ahora

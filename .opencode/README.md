@@ -33,10 +33,10 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   persistente, variables de contexto, autosave.
 - Camino hacia V1.0: fase **P0 completa** (estado central/stop/restart, run-last
   robusto con persistencia, `shell.lua` quote-aware, cache de contexto, cleanup
-  de temporales Java). **P1**: action registry + `register_action`, API pública
-  completa, configuración por proyecto `.code-runner.lua` y custom tasks con
-  variables de contexto (`$testName`/`$entry`/`$entryLine`) ya hechas; queda
-  solo **profiles** (ver `.opencode/ROADMAP.md`).
+  de temporales Java) y fase **P1 completa** (action registry + `register_action`,
+  API pública, `.code-runner.lua`, custom tasks con variables de contexto y
+  profiles opt-in). Siguiente: **P2** (diagnostics, checkhealth, events,
+  wrappers Maven/Gradle, Windows) — ver `.opencode/ROADMAP.md`.
 
 ## Arquitectura (resumen)
 
@@ -51,6 +51,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `actions.lua` | Ensambla el catálogo + overrides de usuario + alias R + orden |
 | `actions/{catalog,java,latex,languages/*}` | Catálogo por grupos (compilados/script) y helpers Java/LaTeX |
 | `actions/registry.lua` | Action registry (P1): `register_action`/`unregister`/`list` |
+| `actions/profiles.lua` | Presets de perfiles opt-in (P1): release/benchmark donde aplica |
 | `context.lua` | API `detect()` con cache + acción contextual "Run test" |
 | `context/{test,entry}.lua` | Detección de test bajo el cursor; entry points (main) TS/regex |
 | `project.lua` | Raíz del proyecto por marcadores por lenguaje + genéricos |

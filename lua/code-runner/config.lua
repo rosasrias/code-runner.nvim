@@ -88,6 +88,13 @@ M.defaults = {
     -- proyecto; carga segura y cacheada por raíz). false lo desactiva.
     enabled = true,
   },
+  profiles = {
+    -- Presets de perfiles (release/benchmark) para lenguajes donde la
+    -- herramienta tiene un modo real (Rust `--release`, Go `-bench`, C/C++
+    -- `-O2`). Opt-in: false (default) mantiene el picker del zero-config sin
+    -- variantes extra. Ver lua/code-runner/actions/profiles.lua.
+    enabled = false,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

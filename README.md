@@ -21,6 +21,7 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - **Historial persistente**: cada ejecución se guarda (con su `cwd` y lenguaje) en `stdpath("data")`. `:CodeRunHistory` lo abre en el picker para re-ejecutar cualquier entrada; las repetidas suben sin duplicarse y muestran cuántas veces corrieron
 - **Última ejecución persistida**: `:CodeRunLast` / `:CodeRunRestart` recuerdan la última acción incluso tras reiniciar Neovim (`last.json`; se puede desactivar con `last_run.persist = false`)
 - Variables de contexto en cualquier comando (acciones, tasks de `.code-runner.lua` y `register_action`): `$testName` (test bajo el cursor), `$entry` (entry point: `fqcn` o `name`) y `$entryLine` (su línea), más `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto)
+- **Profiles opcionales** (`profiles.enabled = true`): variantes release/benchmark donde la herramienta tiene un modo real — Rust (`cargo --release`), Go (`go test -bench`), C/C++ (`-O2`). Por defecto están apagados para no ensuciar el picker del zero-config
 
 ## Comandos
 
@@ -114,6 +115,9 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     -- last_run: persistir la última ejecución para :CodeRunLast/:CodeRunRestart
     -- en una sesión nueva de Neovim:
     -- last_run = { persist = true },
+    -- profiles: variantes release/benchmark donde la herramienta tiene un modo
+    -- real (Rust --release, Go -bench, C/C++ -O2). false (default) no añade nada:
+    -- profiles = { enabled = true },
   },
   keys = {
     { "<C-b>", "<cmd>CodeRun<cr>", desc = "Ejecutar código" },
@@ -161,7 +165,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (194 tests). Corre con:
+Suite propia sin dependencias externas (201 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua

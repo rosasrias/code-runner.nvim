@@ -8,6 +8,8 @@ local terminal = require "code-runner.terminal"
 local catalog = require "code-runner.actions.catalog"
 local registry = require "code-runner.actions.registry"
 local java = require "code-runner.actions.java"
+local shell = require "code-runner.shell"
+local profiles = require "code-runner.actions.profiles"
 
 local M = {}
 
@@ -16,6 +18,23 @@ local notify = terminal.notify
 
 function M.get_actions()
   local actions = catalog.build(open_runner, notify)
+
+  -- Presets de perfiles (opt-in): variantes release/benchmark donde la
+  -- herramienta las tiene de verdad. Se aplica al nivel del catálogo, así el
+  -- usuario/registry pueden sobrescribirlos (misma prioridad que built-in).
+  if config.options.profiles.enabled then
+    local env = {
+      RUN = config.options.icons.run,
+      BUILD = config.options.icons.build,
+      shell = shell,
+    }
+    for key in pairs(actions) do
+      local extra = profiles.for_lang(env, key)
+      if extra then
+        actions[key] = vim.tbl_extend("force", actions[key] or {}, extra)
+      end
+    end
+  end
 
   -- Extensiones del usuario (sobrescriben o añaden)
   for ext, user_actions in pairs(config.options.actions or {}) do
