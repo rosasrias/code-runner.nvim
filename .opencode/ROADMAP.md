@@ -12,7 +12,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] Fix invocado por el estado: terminal reutilizada sin E95 / job anterior en marcha se cancela
 - [x] `:CodeRunStop` — cancelar el proceso activo del plugin (nunca procesos ajenos)
 - [x] `:CodeRunRestart` — detener y re-ejecutar la última acción
-- [ ] Run Last robusto — hoy vive en `last_choice` (memoria); respaldar con historial persistente/persistencia de última acción
+- [x] Run Last robusto — `last_choice` se persiste (last.json) y se recarga en `setup`; `last_choice` en memoria queda como cache
 - [ ] Revisar `shell.lua` — `wrap_command` parte `cmd` por `&&` con `vim.split` (naive); no romper `&&` dentro de comillas; estructuras de comandos donde haga falta
 - [ ] Cache de contexto — `buffer + changedtick + cursor + filetype` para TS/test/main
 - [ ] Cleanup de temporales Java (directorio `tempname()` generado por smart run)

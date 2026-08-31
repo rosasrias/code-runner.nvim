@@ -4,8 +4,22 @@ local M = {}
 
 local last_choice = nil
 
+-- Pone la última elección y la persiste (para :CodeRunLast en la próxima
+-- sesión). También la usamos como cache en memoria.
+local function remember_choice(entry)
+	last_choice = entry
+	require("code-runner.last").set(entry)
+end
+
 M.setup = function(opts)
 	config.setup(opts)
+
+	-- Recuperamos la última ejecución persistida al cargar (solo si no hay
+	-- una en memoria, que tendría prioridad).
+	if not last_choice then
+		last_choice = require("code-runner.last").get()
+	end
+
 	require("code-runner.highlight").setup()
 end
 
@@ -120,6 +134,7 @@ function M.build_run()
 			cwd = cwd,
 		}
 
+		remember_choice(last_choice)
 		execute_action(entry[choice], { ["$testName"] = last_choice.test }, cwd, key, choice)
 	end)
 end
@@ -185,6 +200,7 @@ function M.run_history()
 			cwd = choice.cwd,
 		}
 
+		remember_choice(last_choice)
 		execute_action(choice.cmd, nil, choice.cwd, choice.key)
 	end)
 end
@@ -192,13 +208,6 @@ end
 -- Expuesto para tests
 M._build_entry = build_entry
 M._project_cwd = project_cwd
-
--- Estado de la ejecución actual/última del plugin (copia inmutable):
--- { status = "idle|running|success|failed|cancelled", action, cwd,
---   filetype, buf, code, started_at, ended_at }
-function M.state()
-	return require("code-runner.state").get()
-end
 
 -- Detiene SOLO el job del plugin en marcha (el buffer registrado en el
 -- estado). Cerrar/eliminar ese buffer también mata el job de terminal.

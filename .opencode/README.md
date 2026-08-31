@@ -52,6 +52,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `terminal.lua` | Ventanas horizontales/verticales/float, título/winbar, `q`, autoclose, reuso de ventana, stop |
 | `quickfix.lua` | Parseo de salida → lista quickfix (`:cn`/`:cp`), auto-close en éxito |
 | `history.lua` | Persistencia en `stdpath("data")/code-runner/history.json` |
+| `last.lua` | Última ejecución persistida para `run_last`/`restart` entre sesiones |
 | `picker.lua` | Selector volt con fallback `vim.ui.select` |
 | `shell.lua` | Sustitución de variables y wrapping PowerShell/bash |
 | `highlight.lua` | Grupos propios `CodeRunner*` (defaults enlazados al tema) |

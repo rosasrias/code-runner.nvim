@@ -14,10 +14,9 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - [x] **`:CodeRunRestart`**: `init.restart()` = `_stop_silent()` + `run_last()`;
       `_stop_silent()` es `stop()` sin notificar (restart no quiere el aviso
       intermedio). Comando `:CodeRunRestart`.
-- [ ] **Run Last robusto**: persistir última acción (JSON en
-      `stdpath("data")/code-runner/` junto a history, o usar el tope del
-      historial) y recargarla tras reiniciar Nvim. Mantener `last_choice` de
-      memoria como cache.
+- [x] **Run Last robusto**: `last.lua` persiste la última elección en
+      `stdpath("data")/code-runner/last.json`; `setup` la recarga (`last_choice`
+      pasa a ser cache en memoria). Ocultable con `last_run.persist=false`.
 - [ ] **shell.lua**: evaluar `wrap_command`; si el comando contiene `&&`
       dentro de comillas la partición actual se rompe. Decidir entre tokenizar
       con respeto a quoting o pasar el chain completo a PowerShell/bash.

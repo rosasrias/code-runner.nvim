@@ -19,6 +19,7 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - **Terminal identificada, coloreada y que no se come tu salida**: ventana horizontal/vertical o **flotante** (`direction = "float"`), con **título propio en color** (`title` + `hl_title` winbar en splits / borde en float) que indica la acción elegida (Run/Build) coloreada según su icono y el estado final (OK verde / fallo amarillo). Al terminar se queda abierta para ver el resultado, avisa con el código de salida y se cierra con `q`; si activás `autoclose = true` se cierra sola cuando termina OK y los fallos quedan en el quickfix. Reutiliza solo las terminales del plugin (buffer propio `code-runner`) y nunca deja la sesión sin ventanas
 - **Quickfix con errores**: al terminar un build/test parsea la salida (gcc/clang/rustc/go `file:line:col`, Maven `[ERROR]`, MSVC `file(line,col)`, `--- FAIL:`) y llena la lista quickfix para saltar al error con `:cn` / `:cp`. Se abre automáticamente si el comando falla
 - **Historial persistente**: cada ejecución se guarda (con su `cwd` y lenguaje) en `stdpath("data")`. `:CodeRunHistory` lo abre en el picker para re-ejecutar cualquier entrada; las repetidas suben sin duplicarse y muestran cuántas veces corrieron
+- **Última ejecución persistida**: `:CodeRunLast` / `:CodeRunRestart` recuerdan la última acción incluso tras reiniciar Neovim (`last.json`; se puede desactivar con `last_run.persist = false`)
 - Variables de contexto: `$testName` (test bajo el cursor), `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto) en cualquier comando
 
 ## Comandos
@@ -110,6 +111,9 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     --   enabled = true,
     --   max = 50,
     -- },
+    -- last_run: persistir la última ejecución para :CodeRunLast/:CodeRunRestart
+    -- en una sesión nueva de Neovim:
+    -- last_run = { persist = true },
   },
   keys = {
     { "<C-b>", "<cmd>CodeRun<cr>", desc = "Ejecutar código" },
@@ -157,7 +161,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (154 tests). Corre con:
+Suite propia sin dependencias externas (162 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua

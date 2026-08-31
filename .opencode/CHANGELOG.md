@@ -49,6 +49,17 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
   cancelación" — el gesto del usuario es la confirmación.
 - Comando `:CodeRunRestart` en `plugin/code-runner.lua`. +2 tests (restart: 2).
 
+## Run Last robusto (persiste la última acción)
+
+- Nuevo `lua/code-runner/last.lua`: guarda la última ejecución en
+  `stdpath("data")/code-runner/last.json` (misma forma que `last_choice`).
+  `init.setup` la recarga al arrancar, así `:CodeRunLast` y `:CodeRunRestart`
+  siguen funcionando en una sesión nueva de Neovim. `last_choice` en memoria
+  queda como cache de uso rápido.
+- `build_run`/`run_history` persisten vía `remember_choice()`.
+- Nueva opción `last_run.persist` (default true) para desactivarlo.
+- +6 tests (last: 5, integración setup-reload: 1).
+
 ## 33ec363 — Quickfix se cierra y vacía sola en éxito
 
 - `quickfix.close_on_success` (default `true`): al re-ejecutar con éxito la

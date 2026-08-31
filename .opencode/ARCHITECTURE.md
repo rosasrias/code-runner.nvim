@@ -16,6 +16,7 @@ lua/code-runner/
 ├── terminal.lua   Ventanas (h/v/float), título/winbar, estado, q, autoclose, stop
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
+├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
@@ -57,8 +58,9 @@ plugin/code-runner.lua → init.build_run
         └─ si string → shell.substitute → terminal.open(cmd) → history.add
 ```
 
-`:CodeRunLast` re-ejecuta `last_choice` (en memoria; pendiente respaldo
-persistente). `:CodeRunHistory` → picker sobre `history.list()` → re-ejecuta.
+`:CodeRunLast` re-ejecuta `last_choice` (cache en memoria, recargado desde
+`last.json` al arrancar). `:CodeRunHistory` → picker sobre `history.list()` →
+re-ejecuta.
 
 ## Terminal
 
@@ -105,6 +107,11 @@ exacto `code-runner` + buffer no listado, para no tocar terminales ajenas
 
 **restart (P0 #3)**: `init.restart()` = `_stop_silent()` (stop sin notificar)
 + `run_last()`. Sin job → solo relanza; sin previa → WARN de `run_last`.
+
+**Run last robusto (P0 #4)**: `last.lua` persiste la última elección en
+`last.json` (mismo shape que `last_choice`). `init.setup` la recarga al
+arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
+`last_choice` en memoria es solo cache.
 
 ## Picker
 

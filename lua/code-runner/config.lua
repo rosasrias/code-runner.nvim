@@ -78,6 +78,11 @@ M.defaults = {
     -- Número máximo de entradas guardadas
     max = 50,
   },
+  last_run = {
+    -- Persistir la última ejecución (para :CodeRunLast / :CodeRunRestart en
+    -- una sesión nueva de Neovim). Si no, solo vive en memoria.
+    persist = true,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

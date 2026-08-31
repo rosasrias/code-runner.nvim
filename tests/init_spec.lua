@@ -17,6 +17,17 @@ local function fake_terminal()
   }
 end
 
+-- Rompe la carrera con jobs de terminal de specs previos que comparten el
+-- mismo proceso headless: borra a la fuerza los buffers del plugin que hayan
+-- quedado conectados, para que terminal.open arranque desde cero.
+local function kill_plugin_terminals()
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if vim.b[b] and vim.b[b].code_runner_term then
+      pcall(vim.api.nvim_buf_delete, b, { force = true })
+    end
+  end
+end
+
 T.it("resuelve por extensión (.lua)", function()
   local f = tmpdir .. "/script.lua"
   vim.fn.writefile({ "print(1)" }, f)
@@ -91,6 +102,41 @@ T.it("run_last sin ejecución previa notifica WARN", function()
   T.eq(vim.log.levels.WARN, notified[1].level)
 end)
 
+T.it("setup recarga la última ejecución persistida (sobrevive al reinicio)", function()
+  -- usamos la etiqueta REAL de una acción de lua (con icono)
+  local lua_entry = require("code-runner.actions").get_actions().lua
+  local label = lua_entry.__order[#lua_entry.__order] -- la última de lua es "Run"
+
+  -- persiste una 'última ejecución' como haría una sesión anterior
+  local m = vim.fn.stdpath("data") .. "/code-runner"
+  vim.fn.mkdir(m, "p")
+  local file = m .. "/last.json"
+  vim.fn.writefile({ vim.json.encode({ lang = "lua", choice = label }) }, file)
+
+  -- simulamos reinicio: recargamos code-runner y llamamos setup (que debe
+  -- poblar last_choice desde disco)
+  require("code-runner.last")._data_file = file
+  package.loaded["code-runner"] = nil
+  local cr2 = require "code-runner"
+  cr2.setup {}
+
+  local terminal = require "code-runner.terminal"
+  local original_notify = terminal.notify
+  local calls = 0
+  local msgs = {}
+  terminal.notify = function(msg, level)
+    calls = calls + 1
+    msgs[#msgs + 1] = tostring(msg)
+  end
+
+  cr2.run_last()
+
+  T.eq(0, calls, "run_last no avisa 'no hay ejecución': hay una cargada")
+
+  terminal.notify = original_notify
+  pcall(os.remove, file)
+end)
+
 T.section("init: stop()")
 
 T.it("stop sin ejecución en marcha es un no-op (no rompe nada)", function()
@@ -103,6 +149,7 @@ T.it("stop cancela el job del plugin y libera su buffer", function()
   local terminal = require "code-runner.terminal"
   local state = require "code-runner.state"
 
+  kill_plugin_terminals()
   state.set("idle")
   terminal.open("echo 'para detener'", "horizontal")
 
@@ -143,6 +190,11 @@ T.it("stop no toca terminales externas (solo el buffer registrado)", function()
     "su nombre es term://..., nunca code-runner"
   )
 
+  -- limpieza: detener el job ajeno para no ensuciar los specs siguientes
+  if vim.api.nvim_buf_is_valid(foreign) then
+    pcall(vim.api.nvim_buf_delete, foreign, { force = true })
+  end
+
   terminal.notify = save_notify
 end)
 
@@ -152,6 +204,16 @@ T.it("restart sin job en marcha y sin ejecución previa notifica WARN (de run_la
   local state = require "code-runner.state"
   state.set("idle")
 
+  -- reinicia code-runner sin setup: last_choice queda nil (sin persistencia
+  -- cargada en memoria), por lo que run_last avisa que no hay ejecución previa
+  local last_m = require "code-runner.last"
+  local saved_file = last_m._data_file
+  last_m._data_file = os.tmpname()
+  last_m.clear()
+
+  package.loaded["code-runner"] = nil
+  local cr_fresh = require "code-runner"
+
   local terminal = require "code-runner.terminal"
   local original_notify = terminal.notify
   local notified = {}
@@ -159,13 +221,16 @@ T.it("restart sin job en marcha y sin ejecución previa notifica WARN (de run_la
     table.insert(notified, { msg = msg, level = level })
   end
 
-  cr.restart()
+  cr_fresh.restart()
 
   T.truthy(#notified >= 1, "avisa que no hay ejecución previa")
   T.eq(vim.log.levels.WARN, notified[#notified].level)
   T.eq("idle", state.get().status, "no quedó en running")
 
   terminal.notify = original_notify
+  last_m._data_file = saved_file
+  package.loaded["code-runner"] = nil
+  cr = require "code-runner"
 end)
 
 T.it("restart detiene el job en marcha de forma silenciosa", function()
@@ -181,6 +246,7 @@ T.it("restart detiene el job en marcha de forma silenciosa", function()
   end
 
   state.set("idle")
+  kill_plugin_terminals()
   terminal.open("echo 'seed'", "horizontal")
   T.eq("running", state.get().status)
   local seed_buf = state.get().buf
