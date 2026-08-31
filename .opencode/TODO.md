@@ -60,7 +60,11 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       vía registry). Se carga al correr, antes de construir el catálogo.
       `projectrc.enabled=false` lo desactiva; `projectrc.clear_cache()` para
       reiniciar/cache.
-- [ ] Custom tasks (`tasks.dev/build/test`) con variables de contexto.
+- [x] Custom tasks (`tasks.dev/build/test`) con variables de contexto: las
+      actions/tasks (incl. las del `.code-runner.lua`) reciben las variables de
+      contexto `$testName`, `$entry` (fqcn o name) y `$entryLine` derivadas del
+      cctx detectado, sustituidas en `command` aunque no sean la acción contextual
+      de test. `run_last`/`restart` persisten y reproducen esas vars.
 - [ ] Profiles Run/Build/Test/Debug/Release/Benchmark donde apliquen.
 
 ## P2 — después

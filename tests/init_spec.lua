@@ -100,6 +100,172 @@ T.it("context() detecta el contexto del key dado", function()
   T.eq("lua", cctx.key, "key inferido/resuelto")
 end)
 
+T.it("_context_vars traduce cctx a variables de contexto", function()
+  local vars = cr._context_vars {
+    test = { name = "TestFoo" },
+    entry = { name = "main", line = 12 },
+  }
+  T.eq("TestFoo", vars["$testName"], "$testName")
+  T.eq("main", vars["$entry"], "$entry")
+  T.eq("12", vars["$entryLine"], "$entryLine")
+end)
+
+T.it("_context_vars usa fqcn para $entry cuando existe", function()
+  local vars = cr._context_vars {
+    entry = { name = "main", fqcn = "com.demo.App", line = 9 },
+  }
+  T.eq("com.demo.App", vars["$entry"], "$entry usa fqcn")
+end)
+
+T.it("_context_vars con cctx vacío no inyecta nada", function()
+  local vars = cr._context_vars { key = "lua" }
+  T.falsy(vars["$testName"], "sin test")
+  T.falsy(vars["$entry"], "sin entry")
+end)
+
+T.it("shell substituye $testName y $entry en el comando de una task", function()
+  local shell = require "code-runner.shell"
+  local cmd = shell.substitute("go test -run \"$testName\" --entry $entry", {
+    ["$testName"] = "TestFoo",
+    ["$entry"] = "main",
+  })
+  T.truthy(cmd:find("TestFoo", 1, true), "$testName resuelto")
+  T.truthy(cmd:find("--entry main", 1, true), "$entry resuelto")
+end)
+
+T.it("una task de proyecto recibe $testName y $entry desde el contexto", function()
+  local registry = require "code-runner.actions.registry"
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+
+  -- buffer go con un entry (main) y un test bajo el cursor
+  local f = tmpdir .. "/ctx_task.go"
+  vim.fn.writefile({
+    "package demo",
+    "",
+    "func main() {",
+    "  _ = 1",
+    "}",
+    "",
+    "func TestGreet(t *testing.T) {",
+    "  _ = 1",
+    "}",
+  }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+  vim.api.nvim_win_set_cursor(0, { 7, 1 })
+
+  -- task del proyecto (como haría .code-runner.lua vía el registry)
+  registry.reset()
+  cr.register_action {
+    id = "task_dev",
+    filetypes = { "go" },
+    kind = "run",
+    command = 'go test -run "$testName" --entry $entry',
+  }
+
+  -- capturamos el callback y el comando que llega a terminal.open
+  local orig_select = picker.select
+  local orig_open = terminal.open
+  local chosen, opened
+  picker.select = function(_, _, cb)
+    chosen = cb
+  end
+  terminal.open = function(cmd, _, cwd, label)
+    opened = { cmd = cmd, cwd = cwd, label = label }
+  end
+
+  local ok = pcall(cr.build_run)
+
+  T.truthy(ok, "build_run no lanza")
+
+  local entry = require("code-runner.actions").get_actions().go
+  local label
+  for _, l in ipairs(entry.__order) do
+    if l:find("task_dev", 1, true) then
+      label = l
+    end
+  end
+  if chosen then
+    chosen(label)
+  end
+
+  T.truthy(opened, "la task se ejecutó por terminal")
+  T.truthy(opened and opened.cmd:find('"TestGreet"', 1, true), "$testName inyectado")
+  T.truthy(opened and opened.cmd:find("--entry main", 1, true), "$entry inyectado (fqcn o name)")
+  T.truthy(opened and opened.label and opened.label:find("task_dev", 1, true), "label de la task")
+
+  terminal.open = orig_open
+  picker.select = orig_select
+  registry.reset()
+end)
+
+T.it("run_last reproduce una task de proyecto con sus variables de contexto", function()
+  local registry = require "code-runner.actions.registry"
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+
+  local f = tmpdir .. "/ctx_task2.go"
+  vim.fn.writefile({
+    "package demo",
+    "",
+    "func main() {",
+    "  _ = 1",
+    "}",
+    "",
+    "func TestSum(t *testing.T) {",
+    "  _ = 1",
+    "}",
+  }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+  vim.api.nvim_win_set_cursor(0, { 7, 1 })
+
+  registry.reset()
+  cr.register_action {
+    id = "task_test",
+    filetypes = { "go" },
+    kind = "test",
+    command = 'go test -run "$testName" --entry $entry',
+  }
+
+  local orig_select = picker.select
+  local orig_open = terminal.open
+  local chosen, calls = nil, {}
+  picker.select = function(_, _, cb)
+    chosen = cb
+  end
+  terminal.open = function(cmd)
+    table.insert(calls, cmd)
+  end
+
+  -- primera ejecución: elegimos la task
+  local ok1 = pcall(cr.build_run)
+  local entry = require("code-runner.actions").get_actions().go
+  local label
+  for _, l in ipairs(entry.__order) do
+    if l:find("task_test", 1, true) then
+      label = l
+    end
+  end
+  if chosen then
+    chosen(label)
+  end
+
+  T.truthy(ok1, "build_run ok")
+  T.eq(1, #calls, "primera ejecución")
+  T.truthy(calls[1] and calls[1]:find('"TestSum"', 1, true), "$testName en la primera")
+
+  -- run_last reproduce la misma task con las mismas vars (sin reabrir picker)
+  local ok2 = pcall(cr.run_last)
+  T.truthy(ok2, "run_last ok")
+  T.eq(2, #calls, "run_last re-ejecutó")
+  T.truthy(calls[2] and calls[2]:find('"TestSum"', 1, true), "$testName reproducido en run_last")
+  T.truthy(calls[2] and calls[2]:find("--entry main", 1, true), "$entry reproducido en run_last")
+
+  terminal.open = orig_open
+  picker.select = orig_select
+  registry.reset()
+end)
+
 T.it("run_last sin ejecución previa notifica WARN", function()
   local terminal = require "code-runner.terminal"
   local original_notify = terminal.notify

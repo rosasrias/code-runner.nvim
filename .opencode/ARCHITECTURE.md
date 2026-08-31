@@ -161,6 +161,13 @@ arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
 - `context.test_action(key, ctx)` → (label, cmd): comando por lenguaje desde
   `config.options.context.test[key]` o default; `false` desactiva.
 - `context.decorate(entry, key, ctx)`: inserta "Run test · <name>" al frente.
+- **Variables de contexto para cualquier acción/task** (P1): `init.build_run`
+  deriva `context_vars(cctx)` → `{ $testName, $entry, $entryLine }` del cctx
+  detectado y las inyecta a la acción elegida (via `shell.substitute`), tanto a
+  acciones del catálogo como a tasks de `.code-runner.lua` / `register_action`
+  (no solo a la acción contextual de test). `$entry` usa `fqcn` si existe, si no
+  `name`. `last_choice` persiste `vars`, así `run_last`/`restart` reproducen una
+  task con su contexto original.
 
 ## Diseño a futuro (objetivo)
 

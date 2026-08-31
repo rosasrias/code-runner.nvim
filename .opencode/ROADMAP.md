@@ -22,7 +22,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] Action registry (`register_action`: registrar/sobrescribir/deshabilitar/ordenar/tipo run|build|test|misc)
 - [x] API pública `require("code-runner"): run / run_last / stop / restart / state / context / register_action`
 - [x] Configuración por proyecto `.code-runner.lua` (tasks), carga segura y con defaults
-- [ ] Custom tasks (`tasks.dev/build/test`) con variables de contexto
+- [x] Custom tasks (`tasks.dev/build/test`) con variables de contexto (`$testName`/`$entry`/`$entryLine`) — sustituidas en el command y reproducidas por run_last/restart
 - [ ] Profiles (Run/Build/Test/Debug/Release/Benchmark) — solo donde tengan sentido
 
 ## P2 — Integraciones y pulido

@@ -50,6 +50,28 @@ local function execute_action(action, vars, cwd, key, label)
 	require("code-runner.history").add(cmd, cwd, key)
 end
 
+-- Variables de contexto disponibles para cualquier acción (y task): derivadas
+-- del cctx detectado. Permiten que una task use $testName / $entry / $entryLine
+-- aunque no sea la acción contextual de test.
+--   cctx: { test = { name }, entry = { name, line, fqcn } } (o nil)
+local function context_vars(cctx)
+	local vars = {}
+
+	if cctx and cctx.test and cctx.test.name then
+		vars["$testName"] = cctx.test.name
+	end
+
+	if cctx and cctx.entry then
+		vars["$entry"] = cctx.entry.fqcn or cctx.entry.name
+
+		if cctx.entry.line then
+			vars["$entryLine"] = tostring(cctx.entry.line)
+		end
+	end
+
+	return vars
+end
+
 -- Directorio de trabajo para ejecutar: raíz del proyecto si se detecta
 local function project_cwd(key)
 	if not config.options.project.enabled then
@@ -134,16 +156,19 @@ function M.build_run()
 			return
 		end
 
+		local vars = context_vars(cctx)
+
 		last_choice = {
 			lang = key,
 			choice = choice,
-			test = test_item and cctx.test.name,
+			test = vars["$testName"],
 			cmd = test_item and choice == test_item.label and test_item.cmd or nil,
 			cwd = cwd,
+			vars = vars,
 		}
 
 		remember_choice(last_choice)
-		execute_action(entry[choice], { ["$testName"] = last_choice.test }, cwd, key, choice)
+		execute_action(entry[choice], vars, cwd, key, choice)
 	end)
 end
 
@@ -160,7 +185,7 @@ function M.run_last()
 
 	-- Repetición fiel de un "Run test": el comando quedó guardado con su contexto
 	if last_choice.cmd then
-		execute_action(last_choice.cmd, { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang, last_choice.choice)
+		execute_action(last_choice.cmd, last_choice.vars or { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang, last_choice.choice)
 		return
 	end
 
@@ -172,7 +197,7 @@ function M.run_last()
 		return
 	end
 
-	execute_action(action, nil, last_choice.cwd, last_choice.lang, last_choice.choice)
+	execute_action(action, last_choice.vars, last_choice.cwd, last_choice.lang, last_choice.choice)
 end
 
 -- Selector del historial: re-ejecuta una entrada guardada
@@ -216,6 +241,7 @@ end
 -- Expuesto para tests
 M._build_entry = build_entry
 M._project_cwd = project_cwd
+M._context_vars = context_vars
 
 -- Detiene SOLO el job del plugin en marcha (el buffer registrado en el
 -- estado). Cerrar/eliminar ese buffer también mata el job de terminal.

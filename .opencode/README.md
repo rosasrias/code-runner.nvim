@@ -31,10 +31,12 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   lenguajes, Java smart run + Maven auto, contexto (tests + entry main),
   project root, terminal identificada con título/estado, quickfix, historial
   persistente, variables de contexto, autosave.
-- Camino hacia V1.0: fase **P0 completa** (estado central/stop/restart,
-  run-last robusto con persistencia, `shell.lua` quote-aware, cache de
-  contexto, cleanup de temporales Java). Siguiente: P1 = action registry,
-  API pública, `.code-runner.lua`, profiles (ver `.opencode/ROADMAP.md`).
+- Camino hacia V1.0: fase **P0 completa** (estado central/stop/restart, run-last
+  robusto con persistencia, `shell.lua` quote-aware, cache de contexto, cleanup
+  de temporales Java). **P1**: action registry + `register_action`, API pública
+  completa, configuración por proyecto `.code-runner.lua` y custom tasks con
+  variables de contexto (`$testName`/`$entry`/`$entryLine`) ya hechas; queda
+  solo **profiles** (ver `.opencode/ROADMAP.md`).
 
 ## Arquitectura (resumen)
 

@@ -2,6 +2,22 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P1 · Custom tasks con variables de contexto
+
+- Las acciones y tasks (incl. las definidas en `.code-runner.lua`) reciben ahora
+  las **variables de contexto** derivadas del contexto detectado al ejecutar:
+  - `$testName` — nombre del test bajo el cursor (antes solo disponible en la
+    acción contextual "Run test").
+  - `$entry` — entry point del archivo (el `fqcn` si existe, si no el `name`).
+  - `$entryLine` — línea del entry point.
+- `context_vars(cctx)` en `init.lua` deriva esas vars; `build_run` las inyecta a
+  cualquier acción elegida. Así una task `command = 'go test -run "$testName"'`
+  funciona sin ser la acción contextual de test.
+- `last_choice` persiste `vars`; `run_last`/`:CodeRunRestart` reproducen la task
+  con las mismas variables (fiel al contexto original).
+- +6 tests (integración de task con contexto end-to-end y run_last con vars).
+  Total: **194 tests verdes**.
+
 ## Sesión actual (P0: auditoría + contexto persistente)
 
 - Auditoría completa de arquitectura, tests y CI.
