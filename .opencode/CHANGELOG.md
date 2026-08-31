@@ -60,6 +60,14 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## P1 · API pública completa
+
+- `require("code-runner")` expone ya: `run` (alias de `build_run`),
+  `run_last`, `run_history`, `stop`, `restart`, `state(context?)`, `context(key)`,
+  `register_action`, `unregister_action`, `list_registered_actions`.
+- `context(key)` con `key` opcional (extensión → filetype del buffer).
+- **183 tests verdes.**
+
 ## P1 · Action registry + register_action
 
 - Nuevo `actions/registry.lua`: registrar/sobrescribir/deshabilitar acciones

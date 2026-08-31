@@ -83,6 +83,23 @@ T.it("expone la API pública: build_run, run_last, run_history y state", functio
   T.truthy(cr.state().status, "retorna el estado central (copiado)")
 end)
 
+T.it("API pública completa: run, context, stop, restart, register_action", function()
+  T.truthy(type(cr.run) == "function", "run")
+  T.eq(cr.run, cr.build_run, "run es alias de build_run")
+  T.truthy(type(cr.stop) == "function", "stop")
+  T.truthy(type(cr.restart) == "function", "restart")
+  T.truthy(type(cr.context) == "function", "context")
+  T.truthy(type(cr.register_action) == "function", "register_action")
+  T.truthy(type(cr.unregister_action) == "function", "unregister_action")
+  T.truthy(type(cr.list_registered_actions) == "function", "list_registered_actions")
+end)
+
+T.it("context() detecta el contexto del key dado", function()
+  local cctx = cr.context("lua")
+  T.truthy(type(cctx) == "table", "context retorna tabla")
+  T.eq("lua", cctx.key, "key inferido/resuelto")
+end)
+
 T.it("run_last sin ejecución previa notifica WARN", function()
   local terminal = require "code-runner.terminal"
   local original_notify = terminal.notify

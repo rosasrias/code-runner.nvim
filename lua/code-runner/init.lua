@@ -251,6 +251,21 @@ function M.state()
 	return require("code-runner.state").get()
 end
 
+-- Abre el selector para ejecutar una acción del archivo actual (alias de
+-- build_run, que es la función usada por :CodeRun).
+M.run = M.build_run
+
+-- Detecta el contexto del archivo actual (o del key dado): orientado a
+-- integraciones. Devuelve cctx { key, test, entry }.
+--   key (opcional): extensión; por default se infiere del buffer actual.
+function M.context(key)
+	key = key or vim.fn.expand("%:e")
+	if key == "" then
+		key = vim.bo.filetype
+	end
+	return require("code-runner.context").detect(key)
+end
+
 -- Registra una acción programática para uno o varios lenguajes (P1).
 --   register_action{
 --     id = "mytool", filetypes = {"py"}, kind = "run", command = "mytool %"
