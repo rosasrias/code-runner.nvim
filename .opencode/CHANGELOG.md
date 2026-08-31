@@ -39,6 +39,16 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
   contiene "code-runner", p.ej. dentro del propio repo; `buflisted` acepta
   forma 0/1 y true/false según la build). +3 tests (stop: 3).
 
+## :CodeRunRestart
+
+- `init.restart()` = `_stop_silent()` (stop sin notificar) + `run_last()`. Sin
+  job en marcha, aborta el stop; sin ejecución previa, `run_last` avisa WARN.
+- `init.stop()` refactoriza a `_stop_silent()` (sin notificación) para
+  reutilizarlo; la API pública `stop()` queda igual de efectiva (cancela el
+  job y libera su buffer, terminales ajenas intactas) pero ya no "notifica
+  cancelación" — el gesto del usuario es la confirmación.
+- Comando `:CodeRunRestart` en `plugin/code-runner.lua`. +2 tests (restart: 2).
+
 ## 33ec363 — Quickfix se cierra y vacía sola en éxito
 
 - `quickfix.close_on_success` (default `true`): al re-ejecutar con éxito la

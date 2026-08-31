@@ -93,31 +93,15 @@ end)
 
 T.section("init: stop()")
 
-T.it("stop sin ejecución en marcha notifica WARN y no rompe nada", function()
-  local terminal = require "code-runner.terminal"
-  local original_notify = terminal.notify
-  local notified = {}
-  terminal.notify = function(msg, level)
-    table.insert(notified, { msg = msg, level = level })
-  end
-
+T.it("stop sin ejecución en marcha es un no-op (no rompe nada)", function()
   require("code-runner.state").set("idle")
   cr.stop()
-
-  T.eq(1, #notified, "una sola notificación")
-  T.eq(vim.log.levels.WARN, notified[1].level)
-
-  terminal.notify = original_notify
+  T.eq("idle", require("code-runner.state").get().status)
 end)
 
 T.it("stop cancela el job del plugin y libera su buffer", function()
   local terminal = require "code-runner.terminal"
   local state = require "code-runner.state"
-  local save_notify = terminal.notify
-  local notified = {}
-  terminal.notify = function(msg, level)
-    table.insert(notified, { msg = msg, level = level })
-  end
 
   state.set("idle")
   terminal.open("echo 'para detener'", "horizontal")
@@ -130,9 +114,6 @@ T.it("stop cancela el job del plugin y libera su buffer", function()
 
   T.eq("cancelled", state.get().status, "stop => cancelled")
   T.falsy(vim.api.nvim_buf_is_valid(buf), "el buffer del job fue liberado (el job murió con él)")
-  T.truthy(#notified >= 1, "confirma la cancelación")
-
-  terminal.notify = save_notify
 end)
 
 T.it("stop no toca terminales externas (solo el buffer registrado)", function()
@@ -165,15 +146,64 @@ T.it("stop no toca terminales externas (solo el buffer registrado)", function()
   terminal.notify = save_notify
 end)
 
+T.section("init: restart()")
+
+T.it("restart sin job en marcha y sin ejecución previa notifica WARN (de run_last)", function()
+  local state = require "code-runner.state"
+  state.set("idle")
+
+  local terminal = require "code-runner.terminal"
+  local original_notify = terminal.notify
+  local notified = {}
+  terminal.notify = function(msg, level)
+    table.insert(notified, { msg = msg, level = level })
+  end
+
+  cr.restart()
+
+  T.truthy(#notified >= 1, "avisa que no hay ejecución previa")
+  T.eq(vim.log.levels.WARN, notified[#notified].level)
+  T.eq("idle", state.get().status, "no quedó en running")
+
+  terminal.notify = original_notify
+end)
+
+T.it("restart detiene el job en marcha de forma silenciosa", function()
+  -- contrato principal de restart: el job en marcha se cancela ANTES de delegar
+  -- en run_last (que es quien relanza). Se verifica la parte de stop silencioso
+  -- aislada: _stop_silent cancela sin notificar.
+  local terminal = require "code-runner.terminal"
+  local state = require "code-runner.state"
+  local original_notify = terminal.notify
+  local notified = {}
+  terminal.notify = function(msg, level)
+    table.insert(notified, { msg = msg, level = level })
+  end
+
+  state.set("idle")
+  terminal.open("echo 'seed'", "horizontal")
+  T.eq("running", state.get().status)
+  local seed_buf = state.get().buf
+
+  cr._stop_silent()
+
+  T.eq("cancelled", state.get().status, "stop silencioso => cancelled")
+  T.falsy(vim.api.nvim_buf_is_valid(seed_buf), "liberó el buffer del job")
+  T.eq(0, #notified, "stop silencioso: ninguna notificación")
+
+  terminal.notify = original_notify
+end)
+
 T.section("plugin: comandos de usuario")
 
-T.it("registra :CodeRun, :CodeRunLast, :CodeRunHistory y :CodeRunStop", function()
+T.it("registra :CodeRun, :CodeRunLast, :CodeRunHistory, :CodeRunStop y :CodeRunRestart", function()
   dofile(PLUG_ROOT .. "/plugin/code-runner.lua")
   local cmds = vim.api.nvim_get_commands {}
   T.truthy(cmds.CodeRun, ":CodeRun registrado")
   T.truthy(cmds.CodeRunLast, ":CodeRunLast registrado")
   T.truthy(cmds.CodeRunHistory, ":CodeRunHistory registrado")
   T.truthy(cmds.CodeRunStop, ":CodeRunStop registrado")
+  T.truthy(cmds.CodeRunRestart, ":CodeRunRestart registrado")
 end)
 
 T.it("el guard evita doble registro", function()

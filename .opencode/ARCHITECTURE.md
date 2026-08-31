@@ -103,6 +103,9 @@ exacto `code-runner` + buffer no listado, para no tocar terminales ajenas
 **stop (P0 #2)**: `init.stop()` cierra el buffer del job actual vía
 `_close_current`; solo ese buffer. Terminales ajenas intactas.
 
+**restart (P0 #3)**: `init.restart()` = `_stop_silent()` (stop sin notificar)
++ `run_last()`. Sin job → solo relanza; sin previa → WARN de `run_last`.
+
 ## Picker
 
 - Volt si `ui` preferido y disponible; si no `vim.ui.select`.

@@ -11,7 +11,9 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - [x] **`:CodeRunStop`**: `init.stop()` mata SOLO el buffer registrado en el
       estado (via `_close_current`); terminales ajenas intactas. Comando
       `:CodeRunStop`.
-- [ ] **`:CodeRunRestart`**: combinar stop + re-ejecutar última acción.
+- [x] **`:CodeRunRestart`**: `init.restart()` = `_stop_silent()` + `run_last()`;
+      `_stop_silent()` es `stop()` sin notificar (restart no quiere el aviso
+      intermedio). Comando `:CodeRunRestart`.
 - [ ] **Run Last robusto**: persistir última acción (JSON en
       `stdpath("data")/code-runner/` junto a history, o usar el tope del
       historial) y recargarla tras reiniciar Nvim. Mantener `last_choice` de

@@ -18,3 +18,7 @@ end, { desc = "code-runner: historial de ejecuciones" })
 vim.api.nvim_create_user_command("CodeRunStop", function()
   require("code-runner").stop()
 end, { desc = "code-runner: detener la ejecución en marcha" })
+
+vim.api.nvim_create_user_command("CodeRunRestart", function()
+  require("code-runner").restart()
+end, { desc = "code-runner: detener y repetir la última ejecución" })

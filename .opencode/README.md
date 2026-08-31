@@ -44,6 +44,7 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | --- | --- |
 | `init.lua` | Orquestación: `setup`, `build_run` (picker), `run_last`, `run_history`, `state` |
 | `state.lua` | Estado central (`idle|running|success|failed|cancelled`) + `run_id` anti-carreras + `buf` del job |
+| `init.lua` (`stop`/`restart`) | Detener/relanzar: `restart` = stop silencioso + `run_last` |
 | `config.lua` | Defaults + merge de `opts` |
 | `actions.lua` | Catálogo de acciones por lenguaje (tabla estática + overrides de usuario) |
 | `context.lua` | Detección de test bajo el cursor y entry point (main) vía TS/regex |

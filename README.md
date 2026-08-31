@@ -29,6 +29,7 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 | `:CodeRunLast` | Repite la última ejecución |
 | `:CodeRunHistory` | Re-ejecuta desde el historial |
 | `:CodeRunStop` | Detiene la ejecución en marcha (solo la del plugin) |
+| `:CodeRunRestart` | Detiene la ejecución en marcha y repite la última acción |
 
 ## Estado de ejecución
 
@@ -150,6 +151,7 @@ M.override = {
 | `:CodeRun`     | Abre el selector de acciones         |
 | `:CodeRunLast` | Repite la última acción ejecutada    |
 | `:CodeRunStop` | Detiene la ejecución en marcha (solo la del plugin) |
+| `:CodeRunRestart` | Detiene y repite la última acción |
 
 En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>` o click para ejecutar, `q` para cerrar.
 
