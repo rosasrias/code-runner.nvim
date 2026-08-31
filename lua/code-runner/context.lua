@@ -412,6 +412,13 @@ function M._resolve_key()
 end
 
 -- Analiza el buffer actual. Devuelve { key, test = {name,line}, entry = {name,line,[fqcn]} }
+--
+-- Con cache: el parseo del buffer (TS/regex) es caro y se dispara en cada
+-- :CodeRun. Si el buffer no cambió (changedtick) y el cursor sigue en la misma
+-- línea, se reutiliza el resultado anterior. La clave incluye bufnr y key,
+-- así buffers/idiomas distintos no se pisan.
+local detect_cache = {}
+
 function M.detect(key)
   key = key or M._resolve_key()
   local lang = LANGS[key]
@@ -420,14 +427,36 @@ function M.detect(key)
     return { key = key }
   end
 
-  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local buf = vim.api.nvim_get_current_buf()
+  local changed = vim.b[buf].changedtick
   local cur = vim.api.nvim_win_get_cursor(0)[1]
 
-  return {
+  local cached = detect_cache[buf]
+
+  if cached and cached.changed == changed and cached.cursor == cur and cached.key == key then
+    return cached.result
+  end
+
+  local lines = vim.api.nvim_buf_get_lines(0, 0, -1, false)
+  local result = {
     key = key,
     test = enclosing_test(lang, lines, cur),
     entry = find_entry(key, lines),
   }
+
+  detect_cache[buf] = {
+    changed = changed,
+    cursor = cur,
+    key = key,
+    result = result,
+  }
+
+  return result
+end
+
+-- Expuesto para tests: permite invalidar el cache entre casos.
+function M._clear_cache()
+  detect_cache = {}
 end
 
 ---------------------------------------------------------

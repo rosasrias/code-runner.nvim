@@ -20,9 +20,9 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - [x] **shell.lua**: `wrap_command` ahora usa un splitter quote-aware: solo
       convierte `&&` fuera de comillas; un `&&` literal dentro de `"..."`/
       `'...'` ya no se reescribe (rompía strings al pasarlos a PowerShell).
-- [ ] **Cache de contexto**: en `context.detect`, cache por
-      `{ bufnr, changedtick, cursor, key }`; invalidar por changedtick/cursor.
-      TS parse sin re-parseear cada llamada.
+- [x] **Cache de contexto**: `context.detect` cachea el resultado por
+      `{ bufnr, changedtick, cursor, key }`; se invalida al cambiar cursor o
+      editar el buffer, y no comparte entre idiomas. `_clear_cache()` para tests.
 - [ ] **Cleanup Java**: el `tempname()` del smart run queda en disco; borrar el
       directorio al final del job o con autocmd WinClosed de la terminal.
 

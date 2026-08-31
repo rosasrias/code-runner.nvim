@@ -123,7 +123,10 @@ arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
 
 - `context.detect(key)`: lee el buffer completo + cursor; `enclosing_test`
   (regex por lenguaje: go/py/js/ts/lua/java/rust/php/rb + describe_patterns) y
-  `find_entry` (`ts_entry` TS con fallback `regex_entry`). Sin cache aún.
+  `find_entry` (`ts_entry` TS con fallback `regex_entry`). Con cache por
+  `{ bufnr, changedtick, cursor, key }`: se reutiliza el resultado si el buffer
+  no cambió y el cursor sigue en la misma línea (evita re-parsear en cada
+  `:CodeRun`). `context._clear_cache()` fuerza recomputación (tests).
 - `context.test_action(key, ctx)` → (label, cmd): comando por lenguaje desde
   `config.options.context.test[key]` o default; `false` desactiva.
 - `context.decorate(entry, key, ctx)`: inserta "Run test · <name>" al frente.

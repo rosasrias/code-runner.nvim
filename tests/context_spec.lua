@@ -21,6 +21,52 @@ detect = function()
   return context.detect()
 end
 
+T.section("context: cache de detección")
+
+T.it("misma línea y buffer: reutiliza el mismo resultado (identity)", function()
+  open("cacheable.go", {
+    "package demo",
+    "",
+    "func TestAlpha() {}",
+  })
+  cursor(3)
+  local a = context.detect("go")
+  local b = context.detect("go")
+  T.truthy(a == b, "el cache devuelve el mismo objeto (sin re-parsear)")
+end)
+
+T.it("cambiar de línea invalida el cache (re-parsea)", function()
+  cursor(3)
+  local a = context.detect("go")
+  cursor(1) -- otra línea => resultado distinto
+  local b = context.detect("go")
+  T.falsy(a == b, "distinto cursor => resultado nuevo")
+end)
+
+T.it("editar el buffer (changedtick) invalida el cache", function()
+  cursor(3)
+  local a = context.detect("go")
+  vim.api.nvim_buf_set_lines(0, 0, 0, false, { "-- comentario nuevo" })
+  -- changedtick sube con el cambio; forzamos re-parse aunque la línea siga igual
+  local b = context.detect("go")
+  T.falsy(a == b, "buffer modificado => resultado nuevo")
+end)
+
+T.it("cambiar de key invalida el cache (no comparte entre idiomas)", function()
+  cursor(3)
+  local a = context.detect("go")
+  local b = context.detect("py") -- otro lenguaje sobre el mismo buffer
+  T.falsy(a == b, "distinta key => resultado nuevo")
+end)
+
+T.it("_clear_cache fuerza una recomputación", function()
+  cursor(3)
+  local a = context.detect("go")
+  context._clear_cache()
+  local b = context.detect("go")
+  T.falsy(a == b, "cache vaciado => resultado nuevo")
+end)
+
 T.section("context: detección de tests bajo el cursor")
 
 T.it("go: cursor dentro de un Test* devuelve el nombre", function()

@@ -60,6 +60,13 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## context.lua: cache de detección
+
+- `context.detect` re-parseaba el buffer (TS/regex) en cada `:CodeRun`. Ahora
+  cachea el resultado por `{ bufnr, changedtick, cursor, key }`: reutiliza si
+  el buffer no cambió y el cursor sigue en la misma línea; no comparte entre
+  idiomas; `context._clear_cache()` fuerza recomputación (tests). +5 tests.
+
 ## shell.lua: wrap_command respeta `&&` dentro de comillas
 
 - `vim.split(cmd, "&&", { plain = true })` partía también un `&&` literal
