@@ -13,6 +13,8 @@
 - **Actualizar documentación** después de cambios arquitectónicos
   (`.opencode/*`, README cuando corresponda) y marcar el ROADMAP/TODO.
 - **Priorizar simple > clever, estable > experimental, test > confianza.**
+- **Mantener archivos <= ~300 líneas.** Si uno crece, modularizar por
+  responsabilidad (`actions/`, `context/`, `terminal/`...), no por decoración.
 - No agregar lenguajes al catálogo sin demanda real, mantenibilidad y tests.
 - No introducir MCPs/agentes externos/servidores infra innecesaria.
 - No convertir esto en Overseer: sigue siendo un code-runner zero-config.

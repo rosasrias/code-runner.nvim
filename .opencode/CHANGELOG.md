@@ -60,6 +60,19 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## Refactor de arquitectura: modularización (módulos <= ~300 líneas)
+
+- Regla nueva (AGENTS.md/ARCHITECTURE): ningún archivo supera ~300 líneas.
+- `actions.lua` 597→54: catálogo movido a `actions/` (catalog.lua agrega los
+  grupos; java.lua smart run + Maven; latex.lua; languages/compiled.lua y
+  script.lua). `_internals` preservado para tests.
+- `context.lua` 535→147: detección en `context/test.lua`, entry points en
+  `context/entry.lua`. `_internals`/`detect`/cache intactos.
+- `terminal.lua` 412→241: identificador/locación de buffers en
+  `terminal/buffer.lua`, UI en `terminal/ui.lua`; helpers re-exportados desde
+  `terminal` para conservar la API pública sujeta a tests.
+- Sin cambios de comportamiento: **172 tests verdes**.
+
 ## Cleanup de temporales Java + state.reset()
 
 - El smart run de Java creaba `vim.fn.tempname()` en `actions.lua` y nunca se

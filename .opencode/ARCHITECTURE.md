@@ -1,8 +1,8 @@
 # Arquitectura — code-runner.nvim
 
-Estado a la fecha de este documento. La estructura es **plana**; se migrará a
-subcarpetas (`core/`, `actions/`, `context/`, ...) SOLO cuando haya una razón
-real (mantener la simplicidad es un valor del proyecto).
+Estado a la fecha de este documento. Estructura mayormente plana con **subcarpetas
+solo donde el tamaño lo justifica** (`actions/*`, `context/*`, `terminal/*`); los
+módulos se mantienen por debajo de ~300 líneas. P1 migrará a un action registry.
 
 ## Módulos y responsabilidades
 
@@ -10,17 +10,33 @@ real (mantener la simplicidad es un valor del proyecto).
 lua/code-runner/
 ├── init.lua       Orquestación del flujo de usuario (setup, picker, repeat, state)
 ├── config.lua     Defaults + opts; única fuente de opciones
-├── actions.lua    Catálogo de acciones por extensión/filetype + overrides
-├── context.lua    Detección: test bajo el cursor + entry point (TS con fallback regex)
+├── actions.lua    Ensambla el catálogo + overrides de usuario + alias R + orden
+├── context.lua    API: detect() con cache + acción contextual "Run test"
 ├── project.lua    Raíz del proyecto por marcadores (por lenguaje + genéricos)
-├── terminal.lua   Ventanas (h/v/float), título/winbar, estado, q, autoclose, stop
+├── terminal.lua   Ciclo de vida del job: open/_on_exit/_close_current/_exit_hint, notify
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
 ├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
-└── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
+├── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
+│
+├── actions/
+│   ├── catalog.lua     Construye la tabla `actions` agregando los grupos
+│   ├── java.lua        Smart run de Java (sin Maven) + auto-detección de Maven
+│   ├── latex.lua       Acciones de LaTeX (detectar main, build/ver/limpiar)
+│   └── languages/
+│       ├── compiled.lua  Lenguajes compilados (nativo C/C++/..., go, rust, kt...)
+│       └── script.lua    Lenguajes interpretados/scripting (py, js, lua, ...)
+│
+├── context/
+│   ├── test.lua      Detección de tests bajo el cursor (regex por lenguaje)
+│   └── entry.lua     Entry points (main): treesitter con fallback regex
+│
+└── terminal/
+    ├── buffer.lua    Identificación/localización de buffers de terminal del plugin
+    └── ui.lua        Ventana (h/v/float), título/winbar coloreado, autoclose
 
 plugin/code-runner.lua   Comandos :CodeRun :CodeRunLast :CodeRunHistory
 ```
@@ -30,9 +46,10 @@ plugin/code-runner.lua   Comandos :CodeRun :CodeRunLast :CodeRunHistory
 ```
 config.*  ← (todo)
 shell ← actions, terminal, (tests)
-terminal ← actions, quickfix, highlight(indirecto vía config), init
+terminal ← actions, quickfix, highlight(indirecto vía config), init, terminal.{buffer,ui}
+actions ← actions.{catalog,java,latex,languages.*}
+context ← context.{test,entry}, init, tests
 project ← init (project_cwd), shell (permite $project), tests
-context ← init (detect/decorate), tests
 history ← init
 picker ← init, tests
 highlight ← init.setup
@@ -75,6 +92,11 @@ re-ejecuta.
   autoclose opcional si OK → `_exit_hint` (notify + winbar/título coloreado +
   mapa `q`).
 - Nunca mata terminales ajenas: solo opera sobre buffers con nombre `code-runner`.
+- Modulado en tres piezas: `terminal.lua` (ciclo de vida del job + notify),
+  `terminal/ui.lua` (ventana h/v/float, título/winbar, autoclose) y
+  `terminal/buffer.lua` (identificación/localización de buffers del plugin).
+  Los helpers `_open_window/_maybe_autoclose/_label_parts/_apply_window_label`
+  se re-exportan desde `terminal` para conservar la API pública/tests.
 
 ## Quickfix
 
@@ -126,12 +148,16 @@ arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
 
 ## Contexto
 
+- Modulado en tres piezas: `context.lua` (API + cache + acción "Run test"),
+  `context/test.lua` (detección de tests bajo el cursor) y `context/entry.lua`
+  (entry points / main).
 - `context.detect(key)`: lee el buffer completo + cursor; `enclosing_test`
-  (regex por lenguaje: go/py/js/ts/lua/java/rust/php/rb + describe_patterns) y
-  `find_entry` (`ts_entry` TS con fallback `regex_entry`). Con cache por
-  `{ bufnr, changedtick, cursor, key }`: se reutiliza el resultado si el buffer
-  no cambió y el cursor sigue en la misma línea (evita re-parsear en cada
-  `:CodeRun`). `context._clear_cache()` fuerza recomputación (tests).
+  (en `context/test.lua`, regex por lenguaje: go/py/js/ts/lua/java/rust/php/rb
+  + describe_patterns) y `find_entry` (en `context/entry.lua`: `ts_entry` TS
+  con fallback `regex_entry`). Con cache por `{ bufnr, changedtick, cursor,
+  key }`: se reutiliza el resultado si el buffer no cambió y el cursor sigue en
+  la misma línea (evita re-parsear en cada `:CodeRun`). `context._clear_cache()`
+  fuerza recomputación (tests).
 - `context.test_action(key, ctx)` → (label, cmd): comando por lenguaje desde
   `config.options.context.test[key]` o default; `false` desactiva.
 - `context.decorate(entry, key, ctx)`: inserta "Run test · <name>" al frente.
@@ -139,10 +165,11 @@ arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
 ## Diseño a futuro (objetivo)
 
 `core/` (runner, process, state, events) · `actions/registry` +
-`actions/languages/*` · `context/{tests,entrypoint,treesitter,cache}` ·
-`project/` · `terminal/manager` · `parsers/*` (gcc/msvc/maven/...).
-Migrar módulos solo cuando exista una razón real; no crear archivos chicos por
-decoración.
+`actions/languages/*` (ya en marcha) · `context/{tests,entrypoint}` (ya) ·
+`project/` · `terminal/manager` (parcial: `terminal/{buffer,ui}`) ·
+`parsers/*` (gcc/msvc/maven/...).
+Regla de mantenibilidad: **ningún archivo supera ~300 líneas**; modularizar
+solo con una razón real, sin crear archivos chicos por decoración.
 
 ## Decisiones de diseño clave
 

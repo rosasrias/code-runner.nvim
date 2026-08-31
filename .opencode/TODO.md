@@ -32,6 +32,15 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 
 - Los 7 ítems P0 del ROADMAP están terminados. Pasar a P1.
 
+## Mantenibilidad — modularización (refactor)
+
+- Regla: **ningún archivo > ~300 líneas**. Hecho:
+  - `actions.lua` 597→54; catálogo en `actions/{catalog,java,latex,languages/*}`.
+  - `context.lua` 535→147; en `context/{test,entry}.lua`.
+  - `terminal.lua` 412→241; en `terminal/{buffer,ui}.lua` (+ re-export API/tests).
+- P1 debería reusar esta base para el action registry (`actions/languages/*`
+  ya son módulos por grupo).
+
 ## P1 — siguiente
 
 - [ ] Action registry + `register_action` (id, filetypes, kind, command/run).

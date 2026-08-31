@@ -46,10 +46,13 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `state.lua` | Estado central (`idle|running|success|failed|cancelled`) + `run_id` anti-carreras + `buf` del job + `reset()` |
 | `init.lua` (`stop`/`restart`) | Detener/relanzar: `restart` = stop silencioso + `run_last` |
 | `config.lua` | Defaults + merge de `opts` |
-| `actions.lua` | Catálogo de acciones por lenguaje (tabla estática + overrides de usuario) |
-| `context.lua` | Detección de test bajo el cursor y entry point (main) vía TS/regex |
+| `actions.lua` | Ensambla el catálogo + overrides de usuario + alias R + orden |
+| `actions/{catalog,java,latex,languages/*}` | Catálogo por grupos (compilados/script) y helpers Java/LaTeX |
+| `context.lua` | API `detect()` con cache + acción contextual "Run test" |
+| `context/{test,entry}.lua` | Detección de test bajo el cursor; entry points (main) TS/regex |
 | `project.lua` | Raíz del proyecto por marcadores por lenguaje + genéricos |
-| `terminal.lua` | Ventanas horizontales/verticales/float, título/winbar, `q`, autoclose, reuso de ventana, stop, cleanup de temporales |
+| `terminal.lua` | Ciclo de vida del job: open/`_on_exit`/stop/cleanup + notify |
+| `terminal/{buffer,ui}.lua` | Identificación de buffers; ventana/título/autoclose |
 | `quickfix.lua` | Parseo de salida → lista quickfix (`:cn`/`:cp`), auto-close en éxito |
 | `history.lua` | Persistencia en `stdpath("data")/code-runner/history.json` |
 | `last.lua` | Última ejecución persistida para `run_last`/`restart` entre sesiones |
