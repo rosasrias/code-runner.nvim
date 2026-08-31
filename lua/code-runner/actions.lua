@@ -95,7 +95,9 @@ local function java_plain_run()
     fqcn
   )
 
-  open_runner(cmd)
+  -- El directorio de clases temporales (javac -d) se limpia al terminar el job
+  -- (ver code_runner_cleanup en terminal.open): nunca quedan artefactos en disco.
+  open_runner(cmd, nil, nil, nil, { out })
 end
 
 ---------------------------------------------------------

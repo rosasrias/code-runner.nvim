@@ -64,12 +64,16 @@ re-ejecuta.
 
 ## Terminal
 
-- `terminal.open(cmd, direction, cwd, label)`:
+- `terminal.open(cmd, direction, cwd, label, cleanup)`:
   `shell.wrap_command(cmd)` → reutiliza la última ventana del plugin (buffer
   con nombre `code-runner`) o abre h/v/float → `termopen` con `on_exit`.
-- `_on_exit(buf, code, cwd)` → `quickfix.handle` (parseo → `setqflist`,
-  `copen` si falla, cierre/limpieza si éxito) → autoclose opcional si OK →
-  `_exit_hint` (notify + winbar/título coloreado + mapa `q`).
+  `cleanup` (opcional) es una lista de rutas que se registran en
+  `vim.b[buf].code_runner_cleanup` y se borran al terminar el job.
+- `_on_exit(buf, code, cwd)` → borra los temporales registrados en
+  `vim.b[buf].code_runner_cleanup` (éxito o error) → `quickfix.handle`
+  (parseo → `setqflist`, `copen` si falla, cierre/limpieza si éxito) →
+  autoclose opcional si OK → `_exit_hint` (notify + winbar/título coloreado +
+  mapa `q`).
 - Nunca mata terminales ajenas: solo opera sobre buffers con nombre `code-runner`.
 
 ## Quickfix
@@ -84,7 +88,8 @@ entradas; en éxito con `close_on_success` cierra y vacía, con warnings refresc
 `terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
 job; `_on_exit` registra `success`/`failed` con el exit code si el job sigue
 siendo el actual; `_close_current` (tecla `q` o `:CodeRunStop`) registra
-`cancelled` si corría.
+`cancelled` si corría. `state.reset()` devuelve a un `idle` completamente limpio
+(borra `code`/`action`/`cwd`/etc.), útil para tests y reinicios.
 
 **run_id**: cada ejecución incrementa una generación; el `on_exit` captura su
 propio `run_id` y solo transiciona si sigue siendo el del estado. Así, un

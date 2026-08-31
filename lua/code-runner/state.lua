@@ -62,4 +62,11 @@ function M.get()
   return vim.deepcopy(current)
 end
 
+-- Vuelve a un estado idle completamente limpio (borra code/action/cwd/etc).
+-- Útil para tests y para reinicios sin arrastrar campos del job anterior.
+function M.reset()
+  current = fresh()
+  return true
+end
+
 return M

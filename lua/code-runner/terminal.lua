@@ -295,6 +295,20 @@ function M._on_exit(buf, code, cwd, run_id)
     state.set(code == 0 and "success" or "failed", { code = code, cwd = cwd })
   end
 
+  -- Limpia temporales del job (p.ej. el directorio de clases que `javac -d`
+  -- crea para el smart run de Java) en cuanto termina, sea éxito o error.
+  local paths = vim.b[buf] and vim.b[buf].code_runner_cleanup
+
+  if paths then
+    for _, p in ipairs(paths) do
+      pcall(vim.fn.delete, p, "rf")
+    end
+
+    if vim.b[buf] then
+      vim.b[buf].code_runner_cleanup = nil
+    end
+  end
+
   local qf_count = require("code-runner.quickfix").handle(buf, code, cwd)
 
   local cfg = config.options.terminal
@@ -311,7 +325,7 @@ end
 -- Abre (o reutiliza) una terminal con el comando ya envuelto para el shell.
 -- cwd (opcional): directorio en el que arranca el job (raíz del proyecto).
 -- label (opcional): acción elegida (Run/Build) para el título de la ventana.
-function M.open(cmd, direction, cwd, label)
+function M.open(cmd, direction, cwd, label, cleanup)
   direction = direction or config.options.terminal.direction
   local command = shell.wrap_command(cmd)
 
@@ -359,6 +373,7 @@ function M.open(cmd, direction, cwd, label)
 
   label = label or ""
   vim.b[buf].code_runner_label = label
+  vim.b[buf].code_runner_cleanup = cleanup or nil
   M._apply_window_label(buf, M._label_parts(label))
 
   local opts = {}

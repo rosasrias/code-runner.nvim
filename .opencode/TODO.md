@@ -23,8 +23,14 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - [x] **Cache de contexto**: `context.detect` cachea el resultado por
       `{ bufnr, changedtick, cursor, key }`; se invalida al cambiar cursor o
       editar el buffer, y no comparte entre idiomas. `_clear_cache()` para tests.
-- [ ] **Cleanup Java**: el `tempname()` del smart run queda en disco; borrar el
-      directorio al final del job o con autocmd WinClosed de la terminal.
+- [x] **Cleanup Java**: el smart run registra el dir `tempname()` en
+      `vim.b[buf].code_runner_cleanup`; `terminal._on_exit` lo borra (`delete
+      rf`) al terminar el job (éxito o error). Nueva `state.reset()` (idle
+      limpio, borra code/action/etc) para tests.
+
+## P0 — completo
+
+- Los 7 ítems P0 del ROADMAP están terminados. Pasar a P1.
 
 ## P1 — siguiente
 

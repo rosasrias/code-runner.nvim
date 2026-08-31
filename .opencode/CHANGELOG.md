@@ -60,6 +60,15 @@ Cambios arquitectónicos y features importantes. Lanzamientos una vez existan ta
 - Nueva opción `last_run.persist` (default true) para desactivarlo.
 - +6 tests (last: 5, integración setup-reload: 1).
 
+## Cleanup de temporales Java + state.reset()
+
+- El smart run de Java creaba `vim.fn.tempname()` en `actions.lua` y nunca se
+  borraba: quedaban clases compiladas en disco. Ahora `terminal.open` acepta
+  una lista de rutas (`cleanup`) y las registra en `vim.b[buf].code_runner_cleanup`; `terminal._on_exit` las borra (`vim.fn.delete(p, "rf")`) al terminar el job, con éxito o error. +2 tests.
+- Nueva `state.reset()`: vuelve a un estado `idle` completamente limpio
+  (borra `code`/`action`/`cwd`/etc.), para tests y reinicios sin arrastrar
+  campos del job anterior. Resuelve acoplamiento de orden entre specs.
+
 ## context.lua: cache de detección
 
 - `context.detect` re-parseaba el buffer (TS/regex) en cada `:CodeRun`. Ahora

@@ -15,7 +15,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] Run Last robusto — `last_choice` se persiste (last.json) y se recarga en `setup`; `last_choice` en memoria queda como cache
 - [x] Revisar `shell.lua` — `wrap_command` respeta `&&` dentro de comillas (splitter quote-aware; `vim.split` naive lo rompía)
 - [x] Cache de contexto — `context.detect` cachea por `bufnr + changedtick + cursor + key`; evita re-parsear TS/regex en cada `:CodeRun`; `_clear_cache()` para tests
-- [ ] Cleanup de temporales Java (directorio `tempname()` generado por smart run)
+- [x] Cleanup de temporales Java — el smart run registra su dir `tempname()` en el buffer; `terminal._on_exit` lo borra al terminar (éxito o error); `state.reset()`
 
 ## P1 — Extensibilidad
 

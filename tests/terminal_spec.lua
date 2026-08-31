@@ -282,4 +282,44 @@ T.it("con error también queda abierta y marca el título", function()
   clean_windows()
 end)
 
+T.section("terminal: cleanup de temporales al terminar")
+
+T.it("_on_exit borra las rutas registradas en code_runner_cleanup", function()
+  local state = require "code-runner.state"
+  local temp = vim.fn.tempname() .. "/cr_cleanup"
+  vim.fn.mkdir(temp, "p")
+  vim.fn.writefile({ "x" }, temp .. "/App.class")
+
+  local term_buf = with_term_window()
+  vim.b[term_buf].code_runner_cleanup = { temp }
+
+  state.set("running", { buf = term_buf })
+  local rid = state.get().run_id
+  terminal._on_exit(term_buf, 0, "", rid)
+
+  T.eq(0, vim.fn.isdirectory(temp), "el directorio temporal fue borrado")
+  T.eq(nil, vim.b[term_buf] and vim.b[term_buf].code_runner_cleanup, "se limpia el registro")
+
+  state.reset()
+  clean_windows()
+end)
+
+T.it("_on_exit también limpia cuando el job falla (código != 0)", function()
+  local state = require "code-runner.state"
+  local temp = vim.fn.tempname() .. "/cr_cleanup_err"
+  vim.fn.mkdir(temp, "p")
+
+  local term_buf = with_term_window()
+  vim.b[term_buf].code_runner_cleanup = { temp }
+
+  state.set("running", { buf = term_buf })
+  local rid = state.get().run_id
+  terminal._on_exit(term_buf, 2, "", rid)
+
+  T.eq(0, vim.fn.isdirectory(temp), "sin importar el código de salida")
+
+  state.reset()
+  clean_windows()
+end)
+
 pcall(clean_windows)
