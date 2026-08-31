@@ -4,6 +4,7 @@
 -- API pública: state.get() (copia; nunca se muta el interno).
 -- Interno (lo usa terminal.lua): state.set(status, { action, cwd, filetype, code }).
 local M = {}
+local events = require "code-runner.events"
 
 M.STATUSES = { "idle", "running", "success", "failed", "cancelled" }
 
@@ -44,6 +45,7 @@ function M.set(status, info)
     current.buf = info.buf
     current.started_at = os.time()
     current.run_id = next_run
+    events.emit(status, current)
     return true
   end
 
@@ -53,6 +55,8 @@ function M.set(status, info)
   if info.code ~= nil then
     current.code = info.code
   end
+
+  events.emit(status, current)
 
   return true
 end

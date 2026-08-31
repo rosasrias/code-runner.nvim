@@ -85,7 +85,11 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       acciones del catálogo resuelto (primer token de cada `command` string,
       ignora `$vars`/rutas) y revisa solo los lenguajes usados (historial +
       buffer actual). `glow` como recomendada para markdown.
-- [ ] Events `CodeRunner*`.
+- [x] Events `CodeRunner*`. `events.lua` + emit en `state.set` (un solo punto
+      por transición): `CodeRunnerStart` (running), `CodeRunnerSuccess`/
+      `CodeRunnerFailed`/`CodeRunnerCancelled` y `CodeRunnerExit` (todo estado
+      final). Opt-out con `events.enabled`. Payload via `vim.api.nvim_exec_autocmds`
+      (status/action/cwd/filetype/buf/code).
 - [ ] Maven/Gradle Wrapper (`mvnw`, `./gradlew`).
 - [ ] Windows restante (quoting/msbuild).
 

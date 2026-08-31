@@ -20,6 +20,7 @@ lua/code-runner/
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
 ├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
+├── events.lua     Autocmds User CodeRunner* emitidos desde state.set
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash
 ├── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
@@ -141,6 +142,16 @@ marcar como error lo que el usuario nunca usó, **solo revisa los lenguajes
 usados** = union(historial keys, key del buffer actual). `glow` (preview md) va
 como recomendada. Se auto-descubre por el nombre `health.lua` → `:checkhealth
 code-runner`.
+
+## Events (P2)
+
+`state.lua` es el punto único de transición → `state.set` llama
+`events.emit(status, current)` tras cada cambio. `events.lua` mapea:
+`running→CodeRunnerStart`, `success/failed/cancelled→CodeRunner*`, y todo
+estado final dispara además `CodeRunnerExit`. Emite con
+`vim.api.nvim_exec_autocmds("User", ...)` con
+`data = { status, action, cwd, filetype, buf, code }`. Opt-out con
+`events.enabled=false`. `idle` y `state.reset()` no emiten.
 
 ## Estado central (state.lua)
 

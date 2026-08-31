@@ -98,6 +98,14 @@ M.defaults = {
     -- variantes extra. Ver lua/code-runner/actions/profiles.lua.
     enabled = false,
   },
+  events = {
+    -- Emitir autocmds User `CodeRunnerStart` / `CodeRunnerExit` /
+    -- `CodeRunnerSuccess` / `CodeRunnerFailed` / `CodeRunnerCancelled` cuando
+    -- cambia el estado central. Solo hacen algo si escuchás:
+    --   vim.api.nvim_create_autocmd("User", { pattern = "CodeRunnerSuccess", callback = fn })
+    -- false los desactiva por completo.
+    enabled = true,
+  },
 }
 
 M.options = vim.deepcopy(M.defaults)

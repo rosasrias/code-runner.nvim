@@ -2,6 +2,15 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P2 · Events `CodeRunner*`
+
+- Autocmds User emitidos desde `state.lua` (un solo punto por transición, no
+  hay doble emisión): `CodeRunnerStart` (running), `CodeRunnerSuccess`,
+  `CodeRunnerFailed`, `CodeRunnerCancelled` y `CodeRunnerExit` (todo estado
+  final: success/failed/cancelled). Payload con status/action/cwd/filetype/buf/code.
+- Opt-out con `events.enabled=false`. `idle`/`reset` no emiten.
+- +6 tests (emit + opt-out). Total: **218 tests verdes**.
+
 ## P2 · `:checkhealth code-runner`
 
 - Nuevo `health.lua`: diagnostica core (config/canal de errores) y la
