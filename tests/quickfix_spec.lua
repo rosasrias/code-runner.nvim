@@ -157,3 +157,36 @@ T.it("múltiples errores en varias líneas", function()
   T.eq(1, entries[1].lnum)
   T.eq(6, entries[2].lnum)
 end)
+
+T.it("style=diagnostic redirige a vim.diagnostic y no a la quickfix", function()
+  local cfg = require "code-runner.config"
+  local saved = cfg.options.quickfix.style
+  cfg.options.quickfix.style = "diagnostic"
+
+  local src = vim.fn.tempname() .. ".c"
+  vim.fn.writefile({ "" }, src)
+  local bufnr = vim.fn.bufadd(src)
+
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_lines(buf, 0, -1, false, { src .. ":2:3: error: bad token" })
+
+  vim.fn.setqflist({ { filename = "a.c", lnum = 1, text = "viejo" } }, "r")
+  local count = quickfix.handle(buf, 1, "")
+
+  T.eq(1, count)
+  local diags = vim.diagnostic.get(bufnr, { namespace = require("code-runner.diagnostics").ns })
+  T.eq(1, #diags, "cayó en vim.diagnostic")
+  T.eq(1, diags[1].lnum, "base 0")
+  -- sin abrir ventana ni tocarse la lista quickfix para el build fallido
+  local qfl = vim.fn.getqflist()
+  T.eq(1, #qfl, "la quickfix conserva su entrada previa")
+  T.eq("viejo", qfl[1].text, "la quickfix no se sobrescribió")
+  T.eq(0, #qf_windows(), "no abrió la ventana quickfix")
+
+  cfg.options.quickfix.style = saved
+  vim.diagnostic.reset(require("code-runner.diagnostics").ns)
+  vim.fn.delete(src)
+  pcall(vim.api.nvim_buf_delete, bufnr, { force = true })
+  pcall(vim.api.nvim_buf_delete, buf, { force = true })
+  pcall(vim.cmd, "silent cclose")
+end)

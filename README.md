@@ -17,7 +17,10 @@ Runner de código para Neovim con selector de acciones (picker propio basado en 
 - **Contexto inteligente**: si el cursor está dentro de un test, la primera acción del picker es `Run test` con su comando por lenguaje (Go, Python, JS/TS, Lua, Rust, Java, PHP, Ruby). Detecta el test bajo el cursor (treesitter con fallback por línea) y el entry point (`main` / `__main__`) para mostrar `· main:NN` en el título
 - **Ejecuta desde la raíz del proyecto**: sube buscando marcadores (`go.mod`, `pom.xml`, `package.json`, `.git`, ...) y lanza el comando en ese directorio (`go test`, `pytest`, `mvn test`, ...). Fallback: directorio del archivo
 - **Terminal identificada, coloreada y que no se come tu salida**: ventana horizontal/vertical o **flotante** (`direction = "float"`), con **título propio en color** (`title` + `hl_title` winbar en splits / borde en float) que indica la acción elegida (Run/Build) coloreada según su icono y el estado final (OK verde / fallo amarillo). Al terminar se queda abierta para ver el resultado, avisa con el código de salida y se cierra con `q`; si activás `autoclose = true` se cierra sola cuando termina OK y los fallos quedan en el quickfix. Reutiliza solo las terminales del plugin (buffer propio `code-runner`) y nunca deja la sesión sin ventanas
-- **Quickfix con errores**: al terminar un build/test parsea la salida (gcc/clang/rustc/go `file:line:col`, Maven `[ERROR]`, MSVC `file(line,col)`, `--- FAIL:`) y llena la lista quickfix para saltar al error con `:cn` / `:cp`. Se abre automáticamente si el comando falla
+- **Quickfix con errores**: al terminar un build/test parsea la salida (gcc/clang/rustc/go 
+`file:line:col`, Maven `[ERROR]`, MSVC `file(line,col)`, `--- FAIL:`) y llena la lista quickfix para saltar al error 
+con `:cn` / `:cp`. Se abre automáticamente si el comando falla. Elegible: podés usar `vim.diagnostic` (signos en el 
+búfer) o ambos con `quickfix.style`
 - **Historial persistente**: cada ejecución se guarda (con su `cwd` y lenguaje) en `stdpath("data")`. `:CodeRunHistory` lo abre en el picker para re-ejecutar cualquier entrada; las repetidas suben sin duplicarse y muestran cuántas veces corrieron
 - **Última ejecución persistida**: `:CodeRunLast` / `:CodeRunRestart` recuerdan la última acción incluso tras reiniciar Neovim (`last.json`; se puede desactivar con `last_run.persist = false`)
 - Variables de contexto en cualquier comando (acciones, tasks de `.code-runner.lua` y `register_action`): `$testName` (test bajo el cursor), `$entry` (entry point: `fqcn` o `name`) y `$entryLine` (su línea), más `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto)
@@ -99,12 +102,15 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
     -- },
     -- quickfix: errores de build/test a la lista quickfix (:cn/:cp).
     -- open=true abre la ventana solo cuando el comando falla con errores;
-    -- close_on_success cierra esa ventana y vacía la lista al re-ejecutar bien:
+    -- close_on_success cierra esa ventana y vacía la lista al re-ejecutar bien.
+    -- style elige el canal: "quickfix" (default) | "diagnostic" (vim.diagnostic)
+    -- | "both":
     -- quickfix = {
     --   enabled = true,
     --   open = true,
     --   height = 8,
     --   close_on_success = true,
+    --   style = "quickfix",
     -- },
     -- history: historial persistente de ejecuciones (:CodeRunHistory).
     -- enabled=false lo desactiva; max limita las entradas:
@@ -165,7 +171,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (201 tests). Corre con:
+Suite propia sin dependencias externas (207 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua

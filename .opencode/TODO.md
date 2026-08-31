@@ -77,7 +77,10 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 
 ## P2 — después
 
-- [ ] `vim.diagnostic` para errores (Quickfix se mantiene; opción Quickfix/Diag/Ambos).
+- [x] `vim.diagnostic` para errores (Quickfix se mantiene; opción Quickfix/Diag/Ambos).
+      Nuevo `quickfix.style` (`quickfix`|`diagnostic`|`both`) + módulo
+      `diagnostics.lua` (namespace propio `code-runner`, solo limpia lo suyo,
+      base 0, agrupa por buffer). Default sigue siendo quickfix.
 - [ ] `:checkhealth code-runner`.
 - [ ] Events `CodeRunner*`.
 - [ ] Maven/Gradle Wrapper (`mvnw`, `./gradlew`).

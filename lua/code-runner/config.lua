@@ -70,6 +70,9 @@ M.defaults = {
     -- (los errores ya se corrigieron). Con warnings parseables se refresca
     -- la lista y la ventana queda abierta.
     close_on_success = true,
+    -- Canal de errores. "quickfix" (default) usa la lista quickfix únicamente.
+    -- "diagnostic" usa vim.diagnostic (signos en el búfer). "both" usa ambos.
+    style = "quickfix",
   },
   history = {
     -- Historial de ejecuciones (persistente, en stdpath("data")). El

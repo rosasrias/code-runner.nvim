@@ -24,11 +24,10 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] Configuración por proyecto `.code-runner.lua` (tasks), carga segura y con defaults
 - [x] Custom tasks (`tasks.dev/build/test`) con variables de contexto (`$testName`/`$entry`/`$entryLine`) — sustituidas en el command y reproducidas por run_last/restart
 - [x] Profiles (Run/Build/Test/Debug/Release/Benchmark) — solo donde tengan sentido: presets opt-in (Rust `--release`, Go `-bench`, C/C++ `-O2`); `profiles.enabled=false` por defecto
-- [ ] P1 completa: pasar a P2 →
 
 ## P2 — Integraciones y pulido
 
-- [ ] `vim.diagnostic` para errores de build/test (manteniendo Quickfix; elegible)
+- [x] `vim.diagnostic` para errores de build/test (manteniendo Quickfix; elegible) — nuevo `quickfix.style` (`quickfix`/`diagnostic`/`both`) + módulo `diagnostics.lua`
 - [ ] `:checkhealth code-runner` — requiere/opcional/recomendada por herramienta; distingue lo que el usuario no usa
 - [ ] Events `CodeRunnerStart/Exit/Success/Failed/Cancelled` (solo los que aportan valor)
 - [ ] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes

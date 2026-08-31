@@ -15,6 +15,7 @@ lua/code-runner/
 ├── project.lua    Raíz del proyecto por marcadores (por lenguaje + genéricos)
 ├── terminal.lua   Ciclo de vida del job: open/_on_exit/_close_current/_exit_hint, notify
 ├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
+├── diagnostics.lua Canal de errores alternativo → vim.diagnostic (namespace propio)
 ├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
 ├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
 ├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
@@ -115,6 +116,20 @@ perfiles: sin esto, el picker del zero-config no gana variantes.
 `--- FAIL:`, `File "path", line N` (Python). `handle` devuelve count de
 entradas; en éxito con `close_on_success` cierra y vacía, con warnings refresca.
 
+`quickfix.style` decide el canal de errores: `"quickfix"` (default, solo la
+lista), `"diagnostic"` (`vim.diagnostic`) o `"both"`. En `"diagnostic"/"both"`
+`handle` también delega a `diagnostics.handle(entries, code)`.
+
+## Diagnostics (P2)
+
+`diagnostics.lua` convierte las entradas de `quickfix.parse`
+(`filename/lnum/col/text/type`) a `vim.diagnostic` (lnum/col en **base 0**,
+`end_col` para subrayar el token, severidad ERROR/WARN, `source="code-runner"`)
+y las asigna agrupadas por buffer bajo un **namespace propio** (`code-runner`).
+Con exit `0` (éxito) limpia todos los del namespace; nunca toca los de otros
+plugins. Las entradas sin filename (`--- FAIL:`) no tienen búfer → se
+descartan.
+
 ## Estado central (state.lua)
 
 `terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
@@ -195,7 +210,8 @@ solo con una razón real, sin crear archivos chicos por decoración.
    `"force"`; tabla vacía = deshabilitar). Hacia un registry explícito en P1.
 2. **Runner por terminal gestionada propia**: no tocar terminales del usuario;
    identificador por nombre de buffer.
-3. **Quickfix como canal de errores** (no `vim.diagnostic` todavía).
+3. **Canal de errores elegible**: quickfix por defecto, `vim.diagnostic` o ambos
+   (`quickfix.style`), compartiendo el mismo parseo.
 4. **Fallbacks en cascada** (picker, tests con TS→regex, project markers) para
    maximizar zero-config.
 5. **Historial estructurado** ya persiste (cmd/cwd/key/count/ts) — base para

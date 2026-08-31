@@ -1,6 +1,8 @@
 -- Parsea la salida de build/test y la vuelca a la lista quickfix para
--- navegar a los errores desde el compilador.
+-- navegar a los errores desde el compilador (o a vim.diagnostic si está
+-- configurado `quickfix.style = "diagnostic"`/`"both"`).
 local config = require "code-runner.config"
+local diagnostics = require "code-runner.diagnostics"
 
 local M = {}
 
@@ -84,8 +86,9 @@ function M.parse(lines, cwd)
   return out
 end
 
--- Lee el buffer de terminal, parsea y llena la lista quickfix.
--- Devuelve cuántas entradas quedaron (0 = nada parseable).
+-- Lee el buffer de terminal, parsea y llena el canal de errores configurado
+-- (quickfix y/o diagnostic). Devuelve cuántas entradas quedaron
+-- (0 = nada parseable), que es lo que usa el hint de la terminal.
 function M.handle(buf, code, cwd)
   if not config.options.quickfix.enabled then
     return 0
@@ -96,14 +99,25 @@ function M.handle(buf, code, cwd)
   local count = #entries
   local cfg = config.options.quickfix
 
+  local use_qf = cfg.style ~= "diagnostic"
+  local use_diag = cfg.style == "diagnostic" or cfg.style == "both"
+
+  -- Canal diagnostic (solo o en paralelo): se actualiza siempre, tanto en
+  -- éxit como en error; se limpia solo al terminar con código 0.
+  if use_diag then
+    diagnostics.handle(entries, code)
+  end
+
   -- Éxito: los errores ya se corrigieron, la lista anterior es basura.
   if code == 0 then
-    if count == 0 and cfg.close_on_success then
-      pcall(vim.cmd, "silent cclose")
-      vim.fn.setqflist({}, "r")
-    elseif count > 0 then
-      -- El éxito con warnings: refresca la lista pero no fuerza a abrir.
-      vim.fn.setqflist(entries, "r")
+    if use_qf then
+      if count == 0 and cfg.close_on_success then
+        pcall(vim.cmd, "silent cclose")
+        vim.fn.setqflist({}, "r")
+      elseif count > 0 then
+        -- El éxito con warnings: refresca la lista pero no fuerza a abrir.
+        vim.fn.setqflist(entries, "r")
+      end
     end
 
     return 0
@@ -113,15 +127,18 @@ function M.handle(buf, code, cwd)
     return 0
   end
 
-  vim.fn.setqflist(entries, "r")
+  if use_qf then
+    vim.fn.setqflist(entries, "r")
 
-  if cfg.open then
-    pcall(vim.cmd, "silent copen " .. cfg.height)
-    vim.cmd "wincmd p"
+    if cfg.open then
+      pcall(vim.cmd, "silent copen " .. cfg.height)
+      vim.cmd "wincmd p"
+    end
   end
 
+  local canal = use_qf and (use_diag and "quickfix y vim.diagnostic" or "lista quickfix") or "vim.diagnostic"
   vim.notify(
-    ("%d problema(s) encontrados, ver la lista quickfix (:cl / :cn)"):format(count),
+    ("%d problema(s) encontrados, ver %s (:cl / :cn)"):format(count, canal),
     vim.log.levels.WARN,
     { title = "code-runner.nvim" }
   )

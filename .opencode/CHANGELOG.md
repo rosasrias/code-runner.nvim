@@ -2,6 +2,15 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P2 · Canal de errores `vim.diagnostic` (elegible)
+
+- `quickfix.style` ahora es `"quickfix"` (default) | `"diagnostic"` | `"both"`.
+- Nuevo `diagnostics.lua`: vuelca las entradas parseadas a `vim.diagnostic`
+  bajo un namespace propio (`code-runner`) que solo limpia lo suyo; agrupa por
+  buffer, coordenadas en base 0, `--- FAIL:` (sin archivo) se descarta.
+- La quickfix se mantiene intacta como canal por defecto.
+- +6 tests (diagnostics + routing). Total: **207 tests verdes**.
+
 ## P1 · Profiles (presets opt-in)
 
 - Nuevo `actions/profiles.lua`: variantes de perfil para lenguajes con un modo
