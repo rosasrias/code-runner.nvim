@@ -108,5 +108,23 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
 - Los 6 ítems P2 del ROADMAP están terminados (diagnostic, checkhealth,
   events, wrappers, Windows/C#). Pasar a P3 (V1.0).
 
+## P3 — en curso
+
+- [x] **Task engine básico (workflow)**: `workflow.lua` — engine mínimo, sin
+      scheduler. Una task es una secuencia de pasos (`steps`) con
+      `stop_on_fail` (default true) y resultado por etapa (exit code de cada
+      paso). Ejecución headless con jobstart (no abre terminal a la vista) y
+      envoltura `shell.wrap_command` para multiplataforma.
+- [x] **Definición en `.code-runner.lua`**: `return { tasks = { ci = {
+      steps = { "go build ./...", "go test ./..." } } } }`. Una task con
+      `steps` se registra en el engine (no en el picker); una con
+      `command`/`run` sigue siendo acción del picker (flujo P1 intacto).
+- [x] **API / comando**: `require("code-runner").run_task(name)` +
+      `:CodeRunTask <nombre>`; notifica OK/falló con nro de pasos y
+      errores. `workflow.run_step` devuelve el job id (tests con jobwait).
+- [ ] Tareas paralelas/acotadas (siguiente ítem P3 del ROADMAP).
+
+## Notas
+
 - Nada de lenguajes nuevos.
 - Cada ítem = una sesión de trabajo: implementar → tests → docs → update ROADMAP.

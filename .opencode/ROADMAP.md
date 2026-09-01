@@ -37,7 +37,7 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 
 ## P3 — Task engine
 
-- [ ] Workflows básicos: ejecución secuencial `build → test → run`, stop-si-falla, resultado por etapa
+- [x] Workflows básicos: ejecución secuencial `build → test → run`, stop-si-falla, resultado por etapa — nuevo `workflow.lua` (engine mínimo): tasks con `steps` en `.code-runner.lua` (o `register_task`), ejecución headless con jobstart (sin abrir terminal), stop_on_fail por defecto, resultado por etapa; `:CodeRunTask <nombre>` para invocarlas
 - [ ] Tareas paralelas/acotadas (no un scheduler gigante)
 
 ## P4 — Integraciones externas

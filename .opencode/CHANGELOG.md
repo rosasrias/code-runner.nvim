@@ -2,6 +2,21 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P3 · Task engine básico (workflow)
+
+- Nuevo `workflow.lua`: engine mínimo (sin scheduler) para tasks secuenciales.
+  Una task es una lista `steps` con `stop_on_fail` (default true) y resultado
+  por etapa (exit code de cada paso).
+- Ejecución headless con `jobstart` (no abre terminal a la vista) usando
+  `shell.wrap_command` para multiplataforma; `run_step` devuelve el job id
+  (tests con `jobwait`).
+- `projectrc.lua`: una task en `.code-runner.lua` con `steps` se registra en el
+  engine (no en el picker); con `command`/`run` sigue siendo acción del picker
+  (flujo P1 intacto). `cwd` = raíz del proyecto.
+- API pública `run_task(name)` + `:CodeRunTask <nombre>`; notifica OK/falló con
+  nro de pasos y errores.
+- +12 tests. Total: **245 tests verdes**.
+
 ## P2 · C# msbuild/csc (+ cierre P2)
 
 - `compiled.cs_project_file(dir)` y `compiled.cs_build_cmd(dir, tools)`

@@ -243,6 +243,46 @@ M._build_entry = build_entry
 M._project_cwd = project_cwd
 M._context_vars = context_vars
 
+-- Ejecuta una task de workflow registrada (`.code-runner.lua` con `steps` o
+-- register_task()): corre sus pasos en secuencia (headless) y notifica el
+-- resultado por etapa. `name` es el nombre de la task.
+function M.run_task(name)
+	local workflow = require("code-runner.workflow")
+	local terminal = require("code-runner.terminal")
+
+	if not workflow.list()[name] then
+		terminal.notify("No existe la task de workflow: " .. tostring(name), vim.log.levels.ERROR)
+		return
+	end
+
+	local started = os.time()
+
+	workflow.run(name, function(result)
+		local failed = 0
+
+		for _, r in ipairs(result.results) do
+			if r.code ~= 0 then
+				failed = failed + 1
+			end
+		end
+
+		local secs = os.time() - started
+
+		if result.ok then
+			terminal.notify(
+				("Task '%s' OK — %d paso(s) · %ds"):format(name, #result.results, secs),
+				vim.log.levels.INFO
+			)
+			return
+		end
+
+		terminal.notify(
+			("Task '%s' falló — %d error(es) en %d paso(s) · %ds"):format(name, failed, #result.results, secs),
+			vim.log.levels.ERROR
+		)
+	end)
+end
+
 -- Detiene SOLO el job del plugin en marcha (el buffer registrado en el
 -- estado). Cerrar/eliminar ese buffer también mata el job de terminal.
 -- Cualquier otra terminal/proceso del usuario queda intacta.

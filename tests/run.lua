@@ -31,6 +31,7 @@ dofile(plug_root .. "/tests/events_spec.lua")
 dofile(plug_root .. "/tests/terminal_spec.lua")
 dofile(plug_root .. "/tests/history_spec.lua")
 dofile(plug_root .. "/tests/last_spec.lua")
+dofile(plug_root .. "/tests/workflow_spec.lua")
 dofile(plug_root .. "/tests/state_spec.lua")
 dofile(plug_root .. "/tests/e2e_spec.lua")
 

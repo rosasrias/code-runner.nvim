@@ -23,6 +23,7 @@ lua/code-runner/
 ├── events.lua     Autocmds User CodeRunner* emitidos desde state.set
 ├── picker.lua     Selector volt (+ fallback vim.ui.select)
 ├── shell.lua      Sustitución de variables + wrapping PowerShell/bash + wrappers Maven/Gradle
+├── workflow.lua   Engine de tasks secuenciales (P3): execute() síncrono testeable + run() async con jobstart
 ├── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
 │
 ├── actions/
@@ -49,7 +50,9 @@ plugin/code-runner.lua   Comandos :CodeRun :CodeRunLast :CodeRunHistory
 
 ```
 config.*  ← (todo)
-shell ← actions, terminal, (tests)
+shell ← actions, terminal, workflow, (tests)
+workflow ← projectrc, init, shell
+projectrc ← init, project, registry, workflow, terminal
 terminal ← actions, quickfix, highlight(indirecto vía config), init, terminal.{buffer,ui}
 actions ← actions.{catalog,java,latex,languages.*}
 context ← context.{test,entry}, init, tests

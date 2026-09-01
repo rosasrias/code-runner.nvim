@@ -1,0 +1,203 @@
+local workflow = require "code-runner.workflow"
+local shell = require "code-runner.shell"
+
+-- Blindaje: los tests con comandos reales usan la plataforma real, no el
+-- valor que otros tests hayan dejado en shell.IS_WIN.
+local PLATFORM_WIN = vim.fn.has "win32" == 1
+
+local function clean()
+  workflow.reset()
+  require("code-runner.projectrc").clear_cache()
+end
+
+-- Core síncrono `execute` con run_step inyectado (sin procesos reales).
+
+T.section("workflow: execute (núcleo secuencial)")
+
+T.it("corre todos los pasos en orden (sin stop_on_fail)", function()
+  clean()
+  local called = {}
+  local spec = { name = "t", steps = { "a", "b", "c" }, stop_on_fail = false }
+
+  local res = workflow.execute(spec, function(cmd)
+    table.insert(called, cmd)
+    return cmd == "b" and 1 or 0
+  end)
+
+  T.eq(3, #called, "los 3 pasos se ejecutan")
+  T.eq("a", called[1])
+  T.eq("b", called[2])
+  T.eq("c", called[3])
+  T.falsy(res.ok, "resultado global false por el paso fallido")
+  T.eq(3, #res.results, "hay resultado por cada paso")
+  T.eq(0, res.results[1].code)
+  T.eq(1, res.results[2].code)
+  T.eq(0, res.results[3].code)
+end)
+
+T.it("con stop_on_fail se detiene en el primer error", function()
+  clean()
+  local called = {}
+  local spec = { name = "t", steps = { "ok", "bad", "never" }, stop_on_fail = true }
+
+  local res = workflow.execute(spec, function(cmd)
+    table.insert(called, cmd)
+    return cmd == "bad" and 2 or 0
+  end)
+
+  T.eq(2, #called, "no corre el paso posterior al error")
+  T.eq("ok", called[1])
+  T.eq("bad", called[2])
+  T.falsy(res.ok)
+  T.eq(2, #res.results, "solo hay resultados de los pasos corridos")
+end)
+
+T.it("stop_on_fail por defecto es true", function()
+  clean()
+  -- El default lo normaliza `register`; se ejecuta sobre el spec registrado.
+  workflow.register({ name = "t", steps = { "bad", "never" } })
+  local called = {}
+
+  workflow.execute(workflow.list().t, function(cmd)
+    table.insert(called, cmd)
+    return cmd == "bad" and 1 or 0
+  end)
+
+  T.eq(1, #called, "default detiene en el primer error")
+end)
+
+T.it("todo OK devuelve ok=true y para por todos los pasos", function()
+  clean()
+  local called = 0
+  local spec = { name = "t", steps = { "a", "b" } }
+
+  local res = workflow.execute(spec, function()
+    called = called + 1
+    return 0
+  end)
+
+  T.truthy(res.ok)
+  T.eq(2, called)
+end)
+
+T.it("sustituye $file en los pasos", function()
+  clean()
+  local dir = vim.fn.tempname() .. "/cr_wf_sub"
+  vim.fn.mkdir(dir, "p")
+  local f = dir .. "/x.py"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  local seen = nil
+  local spec = { name = "t", steps = { "python %" } }
+
+  workflow.execute(spec, function(cmd)
+    seen = cmd
+    return 0
+  end)
+
+  T.eq("python " .. f, seen, "$file se sustituye por la ruta del buffer (sin comillas)")
+end)
+
+T.section("workflow: register / list / reset")
+
+T.it("registra una task y la lista", function()
+  clean()
+  workflow.register({ name = "ci", steps = { "go build ./...", "go test ./..." } })
+
+  local list = workflow.list()
+  T.truthy(list.ci, "task registrada")
+  T.eq(2, #list.ci.steps)
+  T.truthy(list.ci.stop_on_fail, "stop_on_fail default true")
+end)
+
+T.it("re-registrar el mismo nombre reemplaza", function()
+  clean()
+  workflow.register({ name = "x", steps = { "v1" } })
+  workflow.register({ name = "x", steps = { "v2" } })
+  T.eq(1, #workflow.list().x.steps)
+  T.eq("v2", workflow.list().x.steps[1])
+end)
+
+T.it("steps vacío lanza error (no se registra mal)", function()
+  clean()
+  local ok = pcall(workflow.register, { name = "mal", steps = {} })
+  T.falsy(ok, "steps vacío rechazado")
+  T.falsy(workflow.list().mal, "no queda registrada")
+end)
+
+T.it("reset limpia las tasks", function()
+  clean()
+  workflow.register({ name = "t", steps = { "a" } })
+  workflow.reset()
+  T.falsy(workflow.list().t, "sin tasks tras reset")
+end)
+
+T.section("workflow: pasos headless reales (jobstart)")
+
+if vim.fn.executable "python" == 1 or PLATFORM_WIN then
+  T.it("un paso exitoso reporta exit 0", function()
+    clean()
+    local cmd = PLATFORM_WIN and "cmd /c exit 0" or "true"
+    shell.IS_WIN = PLATFORM_WIN
+    local job = workflow.run_step(cmd, nil, function() end)
+    vim.fn.jobwait({ job })
+
+    local code = nil
+    local called = 0
+    job = workflow.run_step(cmd, nil, function(c)
+      code = c
+      called = called + 1
+    end)
+    vim.fn.jobwait({ job })
+
+    T.eq(1, called, "on_exit se llamó")
+    T.eq(0, code, "exit code 0")
+  end)
+
+  T.it("un paso que falla reporta exit != 0", function()
+    clean()
+    local cmd = PLATFORM_WIN and "cmd /c exit 7" or "false"
+    shell.IS_WIN = PLATFORM_WIN
+    local code = nil
+    local job = workflow.run_step(cmd, nil, function(c)
+      code = c
+    end)
+    vim.fn.jobwait({ job })
+
+    T.truthy(code ~= nil and code ~= 0, "exit code distinto de cero")
+  end)
+else
+  T.skip("pasos headless", "necesita una shell real (python/cmd) para el E2E")
+end
+
+T.section("workflow: dispatch desde .code-runner.lua")
+
+T.it("una task con steps se registra en el engine (no en el picker)", function()
+  clean()
+  local root = vim.fn.tempname() .. "/cr_wf_dot"
+  vim.fn.mkdir(root, "p")
+  vim.fn.writefile({ "module demo" }, root .. "/go.mod")
+  vim.fn.writefile({
+    "return { tasks = {",
+    "  ci = { steps = { 'go build ./...', 'go test ./...' } },",
+    "  picker = { filetypes = { 'zzz' }, kind = 'run', command = 'pick %' },",
+    "} }",
+  }, root .. "/.code-runner.lua")
+
+  T.truthy(require("code-runner.projectrc").load("go", root))
+
+  local wf = workflow.list()
+  T.truthy(wf.ci, "task con steps en el motor")
+  T.eq(2, #wf.ci.steps)
+  T.eq(root, wf.ci.cwd, "cwd = raíz del proyecto")
+  T.falsy(wf.picker, "la tarea command NO va al motor")
+
+  local entry = require("code-runner.actions").get_actions()["zzz"]
+  T.truthy(entry, "la tarea command sí va al picker")
+  T.falsy(entry.ci, "la task con steps no aparece en el picker")
+
+  clean()
+end)
+
+clean()

@@ -17,15 +17,29 @@ local DOTFILE = ".code-runner.lua"
 local loaded_roots = {}
 
 -- Registra las tasks devueltas por el dotfile (`return { tasks = {...} }`).
-local function register_tasks(tasks)
+-- Dos formas:
+--   - con `steps` (lista de comandos) → task de workflow (engine secuencial,
+--     se invoca por nombre con :CodeRunTask); no aparece en el picker.
+--   - con `command`/`run` → acción del picker (registry), el flujo P1 original.
+local function register_tasks(tasks, root, key)
   local registry = require "code-runner.actions.registry"
 
   for name, task in pairs(tasks) do
-    local spec = vim.tbl_deep_extend("force", task, {
-      id = task.id or name,
-      name = task.name or name,
-    })
-    registry.register(spec)
+    if task.steps ~= nil then
+      require("code-runner.workflow").register({
+        name = task.name or name,
+        steps = task.steps,
+        stop_on_fail = task.stop_on_fail,
+        cwd = task.cwd or root,
+        key = task.key or key,
+      })
+    else
+      local spec = vim.tbl_deep_extend("force", task, {
+        id = task.id or name,
+        name = task.name or name,
+      })
+      registry.register(spec)
+    end
   end
 end
 
@@ -68,7 +82,7 @@ function M.load(key, dir)
   end
 
   if type(result) == "table" and result.tasks then
-    local reg_ok, reg_err = pcall(register_tasks, result.tasks)
+    local reg_ok, reg_err = pcall(register_tasks, result.tasks, root, key)
 
     if not reg_ok then
       terminal.notify(".code-runner.lua: tasks inválidas: " .. tostring(reg_err), vim.log.levels.ERROR)

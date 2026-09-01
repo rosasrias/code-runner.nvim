@@ -22,3 +22,7 @@ end, { desc = "code-runner: detener la ejecución en marcha" })
 vim.api.nvim_create_user_command("CodeRunRestart", function()
   require("code-runner").restart()
 end, { desc = "code-runner: detener y repetir la última ejecución" })
+
+vim.api.nvim_create_user_command("CodeRunTask", function(args)
+  require("code-runner").run_task(args.fargs[1] or "")
+end, { nargs = 1, desc = "code-runner: ejecuta una task de workflow (por nombre)" })

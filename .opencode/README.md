@@ -37,8 +37,9 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   API pública, `.code-runner.lua`, custom tasks con variables de contexto y
   profiles opt-in). **P2 completa**: canal `vim.diagnostic` elegible,
   `:checkhealth code-runner`, events `CodeRunner*`, Maven/Gradle Wrapper y
-  C# msbuild/csc. **Siguiente: P3 (Task engine) para V1.0** — ver
-  `.opencode/ROADMAP.md`.
+  C# msbuild/csc. **P3 (Task engine) en curso**: task engine básico (workflow
+  con pasos secuenciales) terminado; falta el ítem de tareas paralelas/
+  acotadas. Ver `.opencode/ROADMAP.md`.
 
 ## Arquitectura (resumen)
 
@@ -68,10 +69,11 @@ Estructura **plana** en `lua/code-runner/` (aún no hay subcarpetas):
 | `last.lua` | Última ejecución persistida para `run_last`/`restart` entre sesiones |
 | `picker.lua` | Selector volt con fallback `vim.ui.select` |
 | `shell.lua` | Sustitución de variables, wrapping PowerShell/bash y wrappers Maven/Gradle (P2) |
+| `workflow.lua` | Task engine (P3): tasks secuenciales (steps), `execute()` + `run()` async, pasos headless con jobstart |
 | `highlight.lua` | Grupos propios `CodeRunner*` (defaults enlazados al tema) |
 
 Entrada: `plugin/code-runner.lua` define `:CodeRun`, `:CodeRunLast`,
-`:CodeRunHistory`. Lazy-friendly: cargan `code-runner` al invocarse.
+`:CodeRunHistory`, `:CodeRunTask`. Lazy-friendly: cargan `code-runner` al invocarse.
 
 Detalle completo y flujo de ejecución: `.opencode/ARCHITECTURE.md`.
 
@@ -117,4 +119,4 @@ detection, Smart Run, terminal, quickfix, history, custom actions, project
 config (`.code-runner.lua`), tasks/profile básicos, stop/restart,
 diagnostics, checkhealth, tests+E2E, Windows/Linux/macOS, docs, CI.
 
-V1.1+ (no bloquea V1.0): workflows avanzados, DAP, Neotest, VS Code tasks.
+V1.1+ (no bloquea V1.0): tareas paralelas/acotadas, DAP, Neotest, VS Code tasks.
