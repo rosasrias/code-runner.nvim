@@ -31,7 +31,9 @@ Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
 - [x] `:checkhealth code-runner` — requiere/opcional/recomendada: deriva las herramientas del catálogo resuelto y solo revisa los lenguajes que el usuario usa (historial + buffer actual);   `glow` va como recomendada para markdown
 - [x] Events `CodeRunnerStart/Exit/Success/Failed/Cancelled` — autocmds User emitidos desde `state.lua` (un solo punto), opt-out con `events.enabled`; `Exit` cubre cualquier estado final
 - [x] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes — `shell.use_wrappers` en `terminal.open` (usa `cwd`); la auto-run de Java pasa el dir del pom como cwd
-- [ ] Mejoras Windows restantes (quoting, msbuild, etc.)
+- [x] Windows restante — quoting PowerShell quote-aware y acciones `.bat`/`.cmd`/`.ps1` ya estaban; se añade build C# con **msbuild/csc** (`compiled.cs_build_cmd`: `.sln`/`.csproj` → msbuild > dotnet build; `.cs` suelto → csc > dotnet single-file), cross-platform con fallback
+
+**P2 completa** → pasar a P3 (V1.0).
 
 ## P3 — Task engine
 

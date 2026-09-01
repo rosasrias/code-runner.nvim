@@ -35,9 +35,10 @@ proyecto y contexto, y un pequeño task engine extensible detrás.
   robusto con persistencia, `shell.lua` quote-aware, cache de contexto, cleanup
   de temporales Java) y fase **P1 completa** (action registry + `register_action`,
   API pública, `.code-runner.lua`, custom tasks con variables de contexto y
-  profiles opt-in). **P2 en curso**: canal `vim.diagnostic` elegible,
-  `:checkhealth code-runner`, events `CodeRunner*` y Maven/Gradle Wrapper
-  hechos; falta Windows restante — ver `.opencode/ROADMAP.md`.
+  profiles opt-in). **P2 completa**: canal `vim.diagnostic` elegible,
+  `:checkhealth code-runner`, events `CodeRunner*`, Maven/Gradle Wrapper y
+  C# msbuild/csc. **Siguiente: P3 (Task engine) para V1.0** — ver
+  `.opencode/ROADMAP.md`.
 
 ## Arquitectura (resumen)
 

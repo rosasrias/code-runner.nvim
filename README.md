@@ -24,6 +24,7 @@ búfer) o ambos con `quickfix.style`
 - **`:checkhealth code-runner`**: verificá que las herramientas de los lenguajes que usás estén instaladas. Deriva qué binarios necesitan tus acciones y solo reporta los lenguajes que ya usaste (historial + buffer actual), así un toolchain sin instalar que no usás no molesta
 - **Events `CodeRunner*`**: reaccioná al ciclo de ejecución con autocmds User — `CodeRunnerStart`, `CodeRunnerSuccess`, `CodeRunnerFailed`, `CodeRunnerCancelled` y `CodeRunnerExit` (cualquier estado final). Llevan status/action/cwd/filetype/código; opt-out con `events.enabled = false`. Escuchás con `:autocmd User CodeRunnerSuccess ...` o `vim.api.nvim_create_autocmd("User", { pattern = "CodeRunnerSuccess", callback = fn })`
 - **Maven/Gradle Wrapper**: si tu proyecto trae `./mvnw` (o `mvnw.cmd`) / `./gradlew` (o `gradlew.bat`), se usa automáticamente en vez del `mvn`/`gradle` global — sin config. No toca nada si no hay wrapper. Opt-out con `wrappers.enabled = false`
+- **C# build (msbuild/csc)**: `Build (msbuild)` compila según lo que haya — con `.sln`/`.csproj` usa `msbuild` (si está) o `dotnet build`; en un `.cs` suelto usa `csc` o `dotnet` single-file. Cross-platform con fallback
 - **Historial persistente**: cada ejecución se guarda (con su `cwd` y lenguaje) en `stdpath("data")`. `:CodeRunHistory` lo abre en el picker para re-ejecutar cualquier entrada; las repetidas suben sin duplicarse y muestran cuántas veces corrieron
 - **Última ejecución persistida**: `:CodeRunLast` / `:CodeRunRestart` recuerdan la última acción incluso tras reiniciar Neovim (`last.json`; se puede desactivar con `last_run.persist = false`)
 - Variables de contexto en cualquier comando (acciones, tasks de `.code-runner.lua` y `register_action`): `$testName` (test bajo el cursor), `$entry` (entry point: `fqcn` o `name`) y `$entryLine` (su línea), más `$stem` (nombre sin extensión), `%l` (línea del cursor) y `$project` (raíz del proyecto)
@@ -180,7 +181,7 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (225 tests). Corre con:
+Suite propia sin dependencias externas (233 tests). Corre con:
 
 ```powershell
 nvim --headless -l tests/run.lua

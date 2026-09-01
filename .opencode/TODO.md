@@ -96,9 +96,17 @@ Solo tareas accionables y verificables. El roadmap vive en ROADMAP.md.
       `gradlew.bat` según plataforma); `terminal.open` lo aplica con `cwd`; la
       auto-run de Java pasa el dir del pom como `cwd` (antes hacía cd a mano).
       Opt-out con `wrappers.enabled`. Marcadores gradle ya estaban.
-- [ ] Windows restante (quoting/msbuild).
+- [x] C# + msbuild/csc. `compiled.cs_project_file(dir)` (prioridad `.sln` >
+      `.csproj`) y `compiled.cs_build_cmd(dir, tools)` (inyectable para tests):
+      con proyecto → `msbuild` si existe, sino `dotnet build`; `.cs` suelto →
+      `csc` si existe, sino `dotnet <file.cs>`. Acción `Build (msbuild)` en `cs`
+      (función). Cross-platform con fallback (CI 3 OS). Consumers: quoting
+      PowerShell y `.bat`/`.cmd`/`.ps1` ya estaban.
 
-## Notas
+## P2 — completo
+
+- Los 6 ítems P2 del ROADMAP están terminados (diagnostic, checkhealth,
+  events, wrappers, Windows/C#). Pasar a P3 (V1.0).
 
 - Nada de lenguajes nuevos.
 - Cada ítem = una sesión de trabajo: implementar → tests → docs → update ROADMAP.

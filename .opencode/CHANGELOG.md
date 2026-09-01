@@ -2,6 +2,15 @@
 
 Cambios arquitectónicos y features importantes. Lanzamientos una vez existan tags.
 
+## P2 · C# msbuild/csc (+ cierre P2)
+
+- `compiled.cs_project_file(dir)` y `compiled.cs_build_cmd(dir, tools)`
+  (inyectable para tests). Con `.sln`/`.csproj` → `msbuild` si existe, sino
+  `dotnet build`; `.cs` suelto → `csc` si existe, sino `dotnet <file.cs>`.
+- Nueva acción `cs` → `Build (msbuild)` (función con guards cross-platform).
+- **P2 completa** — los 6 ítems hechos y verificados (suite verde).
+- +8 tests. Total: **233 tests verdes**.
+
 ## P2 · Maven/Gradle Wrapper
 
 - `shell.use_wrappers(cmd, cwd)`: si existe `mvnw`/`mvnw.cmd` o

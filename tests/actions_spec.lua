@@ -161,3 +161,68 @@ end)
 T.it("java_source_root devuelve nil si consume toda la ruta", function()
   T.falsy(internals.java_source_root("/com/example/demo", "com.example.demo"))
 end)
+
+T.section("actions: C# msbuild / csc")
+
+local compiled = require "code-runner.actions.languages.compiled"
+
+local csdir = vim.fn.tempname()
+vim.fn.mkdir(csdir, "p")
+
+T.it("cs_project_file da prioridad a .sln sobre .csproj", function()
+  vim.fn.writefile({ "" }, csdir .. "/App.sln")
+  vim.fn.writefile({ "" }, csdir .. "/App.csproj")
+  T.eq(vim.fs.normalize(csdir .. "/App.sln"), vim.fs.normalize(compiled.cs_project_file(csdir)))
+end)
+
+T.it("cs_project_file encuentra .csproj si no hay .sln", function()
+  local d = vim.fn.tempname()
+  vim.fn.mkdir(d, "p")
+  vim.fn.writefile({ "" }, d .. "/Proj.csproj")
+  T.eq(vim.fs.normalize(d .. "/Proj.csproj"), vim.fs.normalize(compiled.cs_project_file(d)))
+end)
+
+T.it("cs_project_file devuelve nil sin proyecto", function()
+  local d = vim.fn.tempname()
+  vim.fn.mkdir(d, "p")
+  T.falsy(compiled.cs_project_file(d))
+end)
+
+T.it("cs_build_cmd con .sln usa msbuild si está disponible", function()
+  local spec = compiled.cs_build_cmd(csdir, { msbuild = true, dotnet = true, csc = true })
+  T.truthy(spec)
+  T.contains(spec.cmd, "msbuild")
+  T.contains(spec.cmd, "App.sln")
+  T.eq(csdir, spec.cwd)
+end)
+
+T.it("cs_build_cmd con proyecto y sin msbuild usa dotnet build", function()
+  local spec = compiled.cs_build_cmd(csdir, { msbuild = false, dotnet = true })
+  T.truthy(spec)
+  T.contains(spec.cmd, "dotnet build")
+  T.contains(spec.cmd, "App.sln")
+end)
+
+T.it("cs_build_cmd con proyecto y sin herramientas devuelve nil", function()
+  T.falsy(compiled.cs_build_cmd(csdir, { msbuild = false, dotnet = false }))
+end)
+
+T.it("cs_build_cmd en .cs suelto usa csc si está disponible", function()
+  local d = vim.fn.tempname()
+  vim.fn.mkdir(d, "p")
+  vim.fn.writefile({ "class P {}" }, d .. "/Main.cs")
+  vim.cmd("edit " .. vim.fn.fnameescape(d .. "/Main.cs"))
+
+  local spec = compiled.cs_build_cmd(d, { csc = true, dotnet = true })
+  T.truthy(spec)
+  T.contains(spec.cmd, "csc")
+end)
+
+T.it("cs_build_cmd en .cs suelto sin csc pero con dotnet usa single-file", function()
+  local d = vim.fn.tempname()
+  vim.fn.mkdir(d, "p")
+  local spec = compiled.cs_build_cmd(d, { csc = false, dotnet = true })
+  T.truthy(spec)
+  T.truthy(spec.cmd:match "^dotnet", "usa dotnet single-file")
+  T.falsy(spec.cmd:find("csc", 1, true), "no usa csc")
+end)

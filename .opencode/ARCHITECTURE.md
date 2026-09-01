@@ -164,6 +164,19 @@ arranque con `mvn`/`gradle` sin tocarlas. La auto-run de Java (`java.maven_run`)
 pasa `pom_dir` como `cwd` (sustituye el `cd`/`Set-Location` a mano). Opt-out
 con `wrappers.enabled=false`.
 
+## C# build (P2)
+
+En `compiled.lua`, la acción `cs` → `Build (msbuild)` (función). Resuelve la
+raíz del proyecto C# y elige herramienta según la plataforma:
+`compiled.cs_project_file(dir)` prioriza `.sln` sobre `.csproj`;
+`compiled.cs_build_cmd(dir, tools)` (con `tools` inyectable para tests):
+- con proyecto → `msbuild '<proj>'` si existe, sino `dotnet build '<proj>'`.
+- `.cs` suelto (sin proyecto) → `csc` si existe (Roslyn de Windows), sino
+  `dotnet '<file.cs>'` (single-file).
+Devuelve `{ cmd, cwd }` o nil (→ notify) si no hay ninguna herramienta.
+Cross-platform: en CI (Linux/macOS) msbuild/csc suelen no existir y cae a
+dotnet, o la acción avisa.
+
 ## Estado central (state.lua)
 
 `terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
