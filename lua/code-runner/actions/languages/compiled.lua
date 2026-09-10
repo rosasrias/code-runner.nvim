@@ -29,9 +29,12 @@ end
 -- Devuelve `{ cmd, cwd }` o nil si no hay ninguna herramienta.
 function M.cs_build_cmd(dir, tools)
   tools = tools or {}
-  local has_msbuild = tools.msbuild ~= nil and tools.msbuild or vim.fn.executable "msbuild" == 1
-  local has_dotnet = tools.dotnet ~= nil and tools.dotnet or vim.fn.executable "dotnet" == 1
-  local has_csc = tools.csc ~= nil and tools.csc or vim.fn.executable "csc" == 1
+  local has_msbuild
+  if tools.msbuild ~= nil then has_msbuild = tools.msbuild else has_msbuild = vim.fn.executable "msbuild" == 1 end
+  local has_dotnet
+  if tools.dotnet ~= nil then has_dotnet = tools.dotnet else has_dotnet = vim.fn.executable "dotnet" == 1 end
+  local has_csc
+  if tools.csc ~= nil then has_csc = tools.csc else has_csc = vim.fn.executable "csc" == 1 end
 
   local proj = M.cs_project_file(dir)
 

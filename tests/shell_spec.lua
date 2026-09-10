@@ -178,13 +178,15 @@ end
 
 T.it("$binRun relativo lleva el prefijo del ejecutable según plataforma", function()
   with_relative_buffer(function()
-    local base = vim.fn.expand "%:r"
+    -- Fix cwd: $binRun ahora es siempre absoluto (%:p:r) para no romper
+    -- cuando vim se abre desde carpeta padre (01_data_types/main.c con cwd=01_data_types)
+    local base = vim.fn.expand "%:p:r"
 
     shell.IS_WIN = true
-    T.eq('& "' .. shell.BIN_PREFIX .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "windows")
+    T.eq('& "' .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "windows absoluto sin prefijo")
 
     shell.IS_WIN = false
-    T.eq('"' .. shell.BIN_PREFIX .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "unix")
+    T.eq('"' .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "unix absoluto sin prefijo")
 
     shell.IS_WIN = IS_WIN_BACKUP
   end)

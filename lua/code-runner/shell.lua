@@ -32,7 +32,7 @@ local SUBSTITUTIONS = {
     return vim.fn.expand "%:p"
   end,
   ["$fileBase"] = function()
-    return vim.fn.expand "%:r"
+    return vim.fn.expand "%:p:r"
   end,
   ["$dir"] = function()
     return vim.fn.expand "%:p:h"
@@ -41,7 +41,7 @@ local SUBSTITUTIONS = {
     return vim.fn.expand "#"
   end,
   ["$file"] = function()
-    return vim.fn.expand "%"
+    return vim.fn.expand "%:p"
   end,
   ["$stem"] = function()
     return vim.fn.expand "%:t:r"
@@ -50,9 +50,11 @@ local SUBSTITUTIONS = {
 
 -- Invocación correcta del binario de $fileBase en cualquier plataforma y
 -- tanto con rutas relativas como absolutas ($fileBase puede ser absoluta
--- si el buffer está fuera del cwd).
+-- si el buffer está fuera del cwd). Siempre absoluto para que el cwd del
+-- proyecto (project.resolve) no rompa rutas relativas tipo 01_data_types/main.c
+-- cuando nvim se abre desde una carpeta padre (Windows).
 function M.bin_run()
-  local base = vim.fn.expand "%:r"
+  local base = vim.fn.expand "%:p:r"
   local target = base .. M.EXE_SUFFIX
 
   -- ¿ruta absoluta? (C:/..., C:\... o /unix)
@@ -73,6 +75,9 @@ function M.substitute(cmd, vars, key)
   vars = vars or {}
 
   local out = cmd:gsub("%%l", tostring(vim.api.nvim_win_get_cursor(0)[1]))
+  -- % siempre absoluto: evita cc1.exe: ...\01_data_types\main.c: No such file
+  -- cuando el buffer se abrió relativo (01_data_types\main.c) pero el job
+  -- corre con cwd = file_dir() (C:\...\01_data_types) via project.resolve.
   out = out:gsub("%%", SUBSTITUTIONS["$file"]())
 
   return (out:gsub("%$%w+", function(token)
