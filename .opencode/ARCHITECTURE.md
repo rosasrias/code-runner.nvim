@@ -1,272 +1,868 @@
-# Arquitectura — code-runner.nvim
+# CodeRunner.nvim Architecture
 
-Estado a la fecha de este documento. Estructura mayormente plana con **subcarpetas
-solo donde el tamaño lo justifica** (`actions/*`, `context/*`, `terminal/*`); los
-módulos se mantienen por debajo de ~300 líneas. P1 migrará a un action registry.
+## Status
 
-## Módulos y responsabilidades
+This document is normative.
 
-```
-lua/code-runner/
-├── init.lua       Orquestación del flujo de usuario (setup, picker, repeat, state)
-├── config.lua     Defaults + opts; única fuente de opciones
-├── actions.lua    Ensambla el catálogo + overrides de usuario + alias R + orden
-├── context.lua    API: detect() con cache + acción contextual "Run test"
-├── project.lua    Raíz del proyecto por marcadores (por lenguaje + genéricos)
-├── terminal.lua   Ciclo de vida del job: open/_on_exit/_close_current/_exit_hint, notify
-├── quickfix.lua   Parseo de salida → quickfix; auto-cierre con éxito
-├── diagnostics.lua Canal de errores alternativo → vim.diagnostic (namespace propio)
-├── health.lua      :checkhealth — deriva herramientas del catálogo, revisa lo usado
-├── history.lua    Historial persistente estructurado (cmd/cwd/key/count/ts)
-├── last.lua       Última ejecución persistida (para run_last/restart en otra sesión)
-├── state.lua      Estado central: idle|running|success|failed|cancelled + run_id + buf
-├── events.lua     Autocmds User CodeRunner* emitidos desde state.set
-├── picker.lua     Selector volt (+ fallback vim.ui.select)
-├── shell.lua      Sustitución de variables + wrapping PowerShell/bash + wrappers Maven/Gradle
-├── workflow.lua   Engine de tasks secuenciales (P3): execute() síncrono testeable + run() async con jobstart
-├── highlight.lua  Grupos propios CodeRunner* (defaults) para tema/picker/terminal
-│
-├── actions/
-│   ├── catalog.lua     Construye la tabla `actions` agregando los grupos
-│   ├── java.lua        Smart run de Java (sin Maven) + auto-detección de Maven
-│   ├── latex.lua       Acciones de LaTeX (detectar main, build/ver/limpiar)
-│   ├── profiles.lua    Presets de perfiles opt-in (release/benchmark)
-│   └── languages/
-│       ├── compiled.lua  Lenguajes compilados (nativo C/C++/..., go, rust, kt...)
-│       └── script.lua    Lenguajes interpretados/scripting (py, js, lua, ...)
-│
-├── context/
-│   ├── test.lua      Detección de tests bajo el cursor (regex por lenguaje)
-│   └── entry.lua     Entry points (main): treesitter con fallback regex
-│
-└── terminal/
-    ├── buffer.lua    Identificación/localización de buffers de terminal del plugin
-    └── ui.lua        Ventana (h/v/float), título/winbar coloreado, autoclose
+If implementation and this document disagree, the implementation should be considered suspect until the discrepancy is intentionally resolved.
 
-plugin/code-runner.lua   Comandos :CodeRun :CodeRunLast :CodeRunHistory
+Architectural changes must be reflected here.
+
+______________________________________________________________________
+
+# 1. Architectural Goal
+
+CodeRunner.nvim must support:
+
+```text
+many languages
+many runtimes
+many task types
+many project structures
+many configuration strategies
 ```
 
-## Dependencias (dirección del require)
+without turning the core into a language-specific conditional system.
 
-```
-config.*  ← (todo)
-shell ← actions, terminal, workflow, (tests)
-workflow ← projectrc, init, shell
-projectrc ← init, project, registry, workflow, terminal
-terminal ← actions, quickfix, highlight(indirecto vía config), init, terminal.{buffer,ui}
-actions ← actions.{catalog,java,latex,languages.*}
-context ← context.{test,entry}, init, tests
-project ← init (project_cwd), shell (permite $project), tests
-history ← init
-picker ← init, tests
-highlight ← init.setup
-quickfix ← terminal._on_exit
+The architecture must allow:
+
+```text
+Add runner
 ```
 
-No hay ciclos de require problematicos; `terminal.notify` lo consume todo el
-mundo (incluido `quickfix` indirectamente vía `_exit_hint`).
+without:
 
-## Flujo de ejecución (Ctrl-b / :CodeRun)
-
-```
-plugin/code-runner.lua → init.build_run
-  ├─ autosave()                       (si autosave y buffer modificado)
-  ├─ build_entry()                    ext → fallback filetype → actions[key]
-  ├─ context.detect(key)              cctx { key, test, entry }
-  ├─ context.decorate(entry, key)     inserta "Run test" contextual al frente
-  ├─ project_cwd(key)                 raíz del proyecto o dir del archivo
-  ├─ título contextual del picker     "⚡ CodeRunner · <file> [ · main:NN]"
-  ├─ picker.select(...)               volt o vim.ui.select; callback on_choice
-  └─ execute_action(action, vars, cwd)
-        ├─ si función → pcall(action) (java smart run, maven, latex, ...)
-        └─ si string → shell.substitute → terminal.open(cmd) → history.add
+```text
+Modify core
+Modify terminal
+Modify picker
+Modify execution
+Modify history
 ```
 
-`:CodeRunLast` re-ejecuta `last_choice` (cache en memoria, recargado desde
-`last.json` al arrancar). `:CodeRunHistory` → picker sobre `history.list()` →
-re-ejecuta.
+______________________________________________________________________
 
-## Profiles (P1)
+# 2. High-Level Architecture
 
-`actions/profiles.lua` expone `for_lang(env, key)` → tabla de acciones extra o
-`nil`, con presets concretos donde la herramienta tiene un modo real: Rust
-`--release`, Go `-bench`, C/C++ `-O2`. Es **opt-in** (`profiles.enabled=false`):
-`actions.lua` solo las aplica al catálogo si está activado, al nivel built-in
-(así el usuario/registry pueden sobrescribirlas). No hay motor genérico de
-perfiles: sin esto, el picker del zero-config no gana variantes.
+```text
+                         User
+                           │
+                           ▼
+                    ┌─────────────┐
+                    │     UI      │
+                    │ picker/cmds │
+                    └──────┬──────┘
+                           │
+                           ▼
+                 ┌───────────────────┐
+                 │   Application      │
+                 │                   │
+                 │ run               │
+                 │ stop              │
+                 │ restart           │
+                 │ resolve           │
+                 │ workflow          │
+                 └─────────┬─────────┘
+                           │
+                           ▼
+                 ┌───────────────────┐
+                 │       Core        │
+                 │                   │
+                 │ Task              │
+                 │ Execution         │
+                 │ Command           │
+                 │ Context           │
+                 │ Result            │
+                 └─────────┬─────────┘
+                           │
+              ┌────────────┼────────────┐
+              │            │            │
+              ▼            ▼            ▼
+          Registry      Context      Execution
+                                      Port
+                                         │
+                                         ▼
+                                  ┌─────────────┐
+                                  │  Adapters   │
+                                  │             │
+                                  │ terminal    │
+                                  │ shell       │
+                                  │ process     │
+                                  │ persistence │
+                                  │ diagnostics │
+                                  └─────────────┘
+```
 
-## Terminal
+______________________________________________________________________
 
-- `terminal.open(cmd, direction, cwd, label, cleanup)`:
-  `shell.wrap_command(cmd)` → reutiliza la última ventana del plugin (buffer
-  con nombre `code-runner`) o abre h/v/float → `termopen` con `on_exit`.
-  `cleanup` (opcional) es una lista de rutas que se registran en
-  `vim.b[buf].code_runner_cleanup` y se borran al terminar el job.
-- `_on_exit(buf, code, cwd)` → borra los temporales registrados en
-  `vim.b[buf].code_runner_cleanup` (éxito o error) → `quickfix.handle`
-  (parseo → `setqflist`, `copen` si falla, cierre/limpieza si éxito) →
-  autoclose opcional si OK → `_exit_hint` (notify + winbar/título coloreado +
-  mapa `q`).
-- Nunca mata terminales ajenas: solo opera sobre buffers con nombre `code-runner`.
-- Modulado en tres piezas: `terminal.lua` (ciclo de vida del job + notify),
-  `terminal/ui.lua` (ventana h/v/float, título/winbar, autoclose) y
-  `terminal/buffer.lua` (identificación/localización de buffers del plugin).
-  Los helpers `_open_window/_maybe_autoclose/_label_parts/_apply_window_label`
-  se re-exportan desde `terminal` para conservar la API pública/tests.
+# 3. Architectural Layers
 
-## Quickfix
+## 3.1 Core
 
-`M.parse` con reglas en orden (primero que matchea gana): `[ERROR] path:[line,col]`,
-`[ERROR] path:[line]`, MSVC `path(line,col)`, `path:line:col:`, `path:line:`,
-`--- FAIL:`, `File "path", line N` (Python). `handle` devuelve count de
-entradas; en éxito con `close_on_success` cierra y vacía, con warnings refresca.
+Contains domain concepts and rules.
 
-`quickfix.style` decide el canal de errores: `"quickfix"` (default, solo la
-lista), `"diagnostic"` (`vim.diagnostic`) o `"both"`. En `"diagnostic"/"both"`
-`handle` también delega a `diagnostics.handle(entries, code)`.
+Core concepts:
 
-## Diagnostics (P2)
+- Task
+- Execution
+- Command
+- Context
+- Result
+- Errors
 
-`diagnostics.lua` convierte las entradas de `quickfix.parse`
-(`filename/lnum/col/text/type`) a `vim.diagnostic` (lnum/col en **base 0**,
-`end_col` para subrayar el token, severidad ERROR/WARN, `source="code-runner"`)
-y las asigna agrupadas por buffer bajo un **namespace propio** (`code-runner`).
-Con exit `0` (éxito) limpia todos los del namespace; nunca toca los de otros
-plugins. Las entradas sin filename (`--- FAIL:`) no tienen búfer → se
-descartan.
+Core MUST NOT depend on Neovim UI.
 
-## Health (:checkhealth, P2)
+Core SHOULD be testable without launching a full Neovim UI environment whenever practical.
 
-`health.lua` no mantiene un mapa manual lenguaje→tool (se desincroniza): las
-herramientas se **derivan** del catálogo resuelto tomando el primer token de
-cada `command` string (`cargo`, `go`, `mvn`, `dotnet`, ...), ignorando `$vars`
-(`$binRun`, `$fileBase`) y rutas con separador (no son del PATH). Para no
-marcar como error lo que el usuario nunca usó, **solo revisa los lenguajes
-usados** = union(historial keys, key del buffer actual). `glow` (preview md) va
-como recomendada. Se auto-descubre por el nombre `health.lua` → `:checkhealth
-code-runner`.
+______________________________________________________________________
 
-## Events (P2)
+## 3.2 Application
 
-`state.lua` es el punto único de transición → `state.set` llama
-`events.emit(status, current)` tras cada cambio. `events.lua` mapea:
-`running→CodeRunnerStart`, `success/failed/cancelled→CodeRunner*`, y todo
-estado final dispara además `CodeRunnerExit`. Emite con
-`vim.api.nvim_exec_autocmds("User", ...)` con
-`data = { status, action, cwd, filetype, buf, code }`. Opt-out con
-`events.enabled=false`. `idle` y `state.reset()` no emiten.
+Coordinates use cases.
 
-## Maven/Gradle Wrapper (P2)
+Examples:
 
-`shell.use_wrappers(cmd, cwd)` reemplaza el primer token `mvn`/`gradle` por el
-wrapper del proyecto si el archivo existe en `cwd` (`mvnw`/`mvnw.cmd`,
-`gradlew`/`gradlew.bat` según `shell.IS_WIN`, invocado con `./`/`.\`). Si no
-hay wrapper (o no es `mvn`/`gradle`) devuelve el comando intacto. Se aplica en
-`terminal.open` con el `cwd` del proyecto → cubre cualquier acción string que
-arranque con `mvn`/`gradle` sin tocarlas. La auto-run de Java (`java.maven_run`)
-pasa `pom_dir` como `cwd` (sustituye el `cd`/`Set-Location` a mano). Opt-out
-con `wrappers.enabled=false`.
+```text
+run
+run_last
+stop
+restart
+resolve tasks
+execute task
+run workflow
+```
 
-## C# build (P2)
+Application knows how to coordinate core objects and ports.
 
-En `compiled.lua`, la acción `cs` → `Build (msbuild)` (función). Resuelve la
-raíz del proyecto C# y elige herramienta según la plataforma:
-`compiled.cs_project_file(dir)` prioriza `.sln` sobre `.csproj`;
-`compiled.cs_build_cmd(dir, tools)` (con `tools` inyectable para tests):
-- con proyecto → `msbuild '<proj>'` si existe, sino `dotnet build '<proj>'`.
-- `.cs` suelto (sin proyecto) → `csc` si existe (Roslyn de Windows), sino
-  `dotnet '<file.cs>'` (single-file).
-Devuelve `{ cmd, cwd }` o nil (→ notify) si no hay ninguna herramienta.
-Cross-platform: en CI (Linux/macOS) msbuild/csc suelen no existir y cae a
-dotnet, o la acción avisa.
+Application MUST NOT contain language-specific runner implementations.
 
-## Estado central (state.lua)
+______________________________________________________________________
 
-`terminal.open` registra `running` (action, cwd, filetype) antes de lanzar el
-job; `_on_exit` registra `success`/`failed` con el exit code si el job sigue
-siendo el actual; `_close_current` (tecla `q` o `:CodeRunStop`) registra
-`cancelled` si corría. `state.reset()` devuelve a un `idle` completamente limpio
-(borra `code`/`action`/`cwd`/etc.), útil para tests y reinicios.
+## 3.3 Registry
 
-**run_id**: cada ejecución incrementa una generación; el `on_exit` captura su
-propio `run_id` y solo transiciona si sigue siendo el del estado. Así, un
-on_exit asíncrono de un job viejo (reemplazado o cancelado) jamás pisa el
-estado del que corre ahora.
+Registry manages runtime definitions.
 
-**Reuso de terminal**: la ventana del plugin se reutiliza; `termopen` reinicia
-el job en el mismo buffer (antes: se creaba otro buffer con el mismo nombre →
-E95). Si el job anterior seguía corriendo, se cancela (`cancelled`) y se abre
-desde cero. La key/filetype se resuelve ANTES de cambiar la ventana actual.
+There are two primary registries:
 
-**Identificación del buffer propio**: `termopen` renombra el buffer a
-`term://cwd//pid:cmd`, así que el nombre no basta. Al crearlo se marca con
-`b:code_runner_term` (sobrevive al rename). La purga de huérfanos usa basename
-exacto `code-runner` + buffer no listado, para no tocar terminales ajenas
-(cuyo path puede contener "code-runner") ni archivos reales del usuario.
+```text
+Task Registry
+Runner Registry
+```
 
-**stop (P0 #2)**: `init.stop()` cierra el buffer del job actual vía
-`_close_current`; solo ese buffer. Terminales ajenas intactas.
+Runner Registry describes available runners.
 
-**restart (P0 #3)**: `init.restart()` = `_stop_silent()` (stop sin notificar)
-+ `run_last()`. Sin job → solo relanza; sin previa → WARN de `run_last`.
+Task Registry contains resolved/registered tasks.
 
-**Run last robusto (P0 #4)**: `last.lua` persiste la última elección en
-`last.json` (mismo shape que `last_choice`). `init.setup` la recarga al
-arrancar → `:CodeRunLast`/`:CodeRunRestart` sobreviven al reinicio.
-`last_choice` en memoria es solo cache.
+______________________________________________________________________
 
-## Picker
+## 3.4 Context
 
-- Volt si `ui` preferido y disponible; si no `vim.ui.select`.
-- Items = tablas (historial) con `format_item`; `%` y `1-9`; click; `q`.
-- Color por icono: `CodeRunnerActionRun/Build/Misc` (propios del plugin).
+Context provides information about the current environment.
 
-## Contexto
+Examples:
 
-- Modulado en tres piezas: `context.lua` (API + cache + acción "Run test"),
-  `context/test.lua` (detección de tests bajo el cursor) y `context/entry.lua`
-  (entry points / main).
-- `context.detect(key)`: lee el buffer completo + cursor; `enclosing_test`
-  (en `context/test.lua`, regex por lenguaje: go/py/js/ts/lua/java/rust/php/rb
-  + describe_patterns) y `find_entry` (en `context/entry.lua`: `ts_entry` TS
-  con fallback `regex_entry`). Con cache por `{ bufnr, changedtick, cursor,
-  key }`: se reutiliza el resultado si el buffer no cambió y el cursor sigue en
-  la misma línea (evita re-parsear en cada `:CodeRun`). `context._clear_cache()`
-  fuerza recomputación (tests).
-- `context.test_action(key, ctx)` → (label, cmd): comando por lenguaje desde
-  `config.options.context.test[key]` o default; `false` desactiva.
-- `context.decorate(entry, key, ctx)`: inserta "Run test · <name>" al frente.
-- **Variables de contexto para cualquier acción/task** (P1): `init.build_run`
-  deriva `context_vars(cctx)` → `{ $testName, $entry, $entryLine }` del cctx
-  detectado y las inyecta a la acción elegida (via `shell.substitute`), tanto a
-  acciones del catálogo como a tasks de `.code-runner.lua` / `register_action`
-  (no solo a la acción contextual de test). `$entry` usa `fqcn` si existe, si no
-  `name`. `last_choice` persiste `vars`, así `run_last`/`restart` reproducen una
-  task con su contexto original.
+```text
+current file
+filetype
+project root
+project type
+test
+entrypoint
+cursor
+buffer
+workspace
+```
 
-## Diseño a futuro (objetivo)
+Context detection must remain independent from task execution.
 
-`core/` (runner, process, state, events) · `actions/registry` +
-`actions/languages/*` (ya en marcha) · `context/{tests,entrypoint}` (ya) ·
-`project/` · `terminal/manager` (parcial: `terminal/{buffer,ui}`) ·
-`parsers/*` (gcc/msvc/maven/...).
-Regla de mantenibilidad: **ningún archivo supera ~300 líneas**; modularizar
-solo con una razón real, sin crear archivos chicos por decoración.
+______________________________________________________________________
 
-## Decisiones de diseño clave
+## 3.5 Execution
 
-1. **Acciones = tabla** `{ [ext] = { [label] = cmd|fn } }`, con `__order` para
-   el selector. Extensión de usuario vía `config.options.actions` (merge
-   `"force"`; tabla vacía = deshabilitar). Hacia un registry explícito en P1.
-2. **Runner por terminal gestionada propia**: no tocar terminales del usuario;
-   identificador por nombre de buffer.
-3. **Canal de errores elegible**: quickfix por defecto, `vim.diagnostic` o ambos
-   (`quickfix.style`), compartiendo el mismo parseo.
-4. **Fallbacks en cascada** (picker, tests con TS→regex, project markers) para
-   maximizar zero-config.
-5. **Historial estructurado** ya persiste (cmd/cwd/key/count/ts) — base para
-   run-last robusto en P0.
-6. **Windows = ciudadano de primera** (PowerShell, `.exe`, rutas con espacios).
-7. **Tests propios** (runner.lua) sin framework externo + E2E con compilación real.
-8. **`wrap_command` quote-aware**: divide `&&` solo fuera de comillas (al pasar
-   cadenas con `&&` literal a PowerShell no se corrompen).
+Execution owns the lifecycle of a running task.
+
+Lifecycle:
+
+```text
+created
+    ↓
+starting
+    ↓
+running
+    ↓
+ ┌──┼─────────┐
+ ▼  ▼         ▼
+success failed cancelled
+```
+
+Execution owns:
+
+- execution identity
+- status
+- process lifecycle
+- result
+- timestamps
+- cancellation
+- restart semantics
+- lifecycle events
+
+______________________________________________________________________
+
+## 3.6 Adapters
+
+Adapters connect the application/core to external systems.
+
+Examples:
+
+```text
+Neovim terminal
+Neovim diagnostics
+quickfix
+shell
+process spawning
+filesystem
+persistence
+notifications
+autocmd/events
+```
+
+Adapters may depend on Neovim APIs.
+
+Core should not.
+
+______________________________________________________________________
+
+## 3.7 UI
+
+UI is responsible for presentation.
+
+Examples:
+
+```text
+picker
+terminal UI
+highlighting
+notifications
+command-line integration
+```
+
+UI must not contain domain rules.
+
+______________________________________________________________________
+
+# 4. Dependency Direction
+
+The intended dependency direction is:
+
+```text
+UI
+ ↓
+Application
+ ↓
+Core
+ ↓
+Ports
+ ↓
+Adapters
+```
+
+Runner definitions depend on contracts exposed by Core/Application.
+
+The reverse is forbidden.
+
+For example:
+
+```text
+GOOD:
+
+runner → TaskSpec
+runner → Context
+
+BAD:
+
+core → runner/go.lua
+runner/go.lua → terminal.lua
+runner/go.lua → picker.lua
+```
+
+______________________________________________________________________
+
+# 5. Task
+
+A Task is an executable definition.
+
+Conceptually:
+
+```lua
+{
+    id = "go.test",
+    name = "Test",
+    kind = "test",
+
+    filetypes = {
+        "go",
+    },
+
+    command = "go test ./...",
+
+    cwd = "project",
+
+    condition = function(context)
+        ...
+    end,
+}
+```
+
+Task identity:
+
+```text
+id
+```
+
+Task presentation:
+
+```text
+name
+description
+icon
+```
+
+must remain separate.
+
+______________________________________________________________________
+
+# 6. Execution
+
+An Execution is a runtime instance of a Task.
+
+Conceptually:
+
+```lua
+{
+    id = 42,
+
+    task_id = "go.test",
+
+    context = {...},
+
+    command = {...},
+
+    status = "running",
+
+    process = {
+        pid = 1234,
+    },
+
+    started_at = ...,
+    finished_at = nil,
+
+    result = nil,
+}
+```
+
+Multiple executions may exist for the same Task.
+
+Example:
+
+```text
+go.test
+ ├── Execution #41
+ ├── Execution #42
+ └── Execution #43
+```
+
+The architecture must not assume one execution per task.
+
+______________________________________________________________________
+
+# 7. Command
+
+A Command is the resolved executable representation of a Task.
+
+User-friendly:
+
+```lua
+command = "go test $file"
+```
+
+may become:
+
+```lua
+{
+    executable = "go",
+    args = {
+        "test",
+        "/project/foo_test.go",
+    },
+
+    cwd = "/project",
+}
+```
+
+Command resolution belongs to the application/core boundary.
+
+Shell-specific quoting and process invocation belong to adapters.
+
+______________________________________________________________________
+
+# 8. Context
+
+Context is immutable input for task resolution whenever practical.
+
+Example:
+
+```lua
+{
+    file = "/project/foo_test.go",
+
+    filetype = "go",
+
+    cursor = {
+        line = 42,
+        column = 10,
+    },
+
+    project = {
+        root = "/project",
+        marker = "go.mod",
+    },
+
+    test = {
+        name = "TestFoo",
+    },
+
+    entrypoint = nil,
+}
+```
+
+Context detection should be cached when possible.
+
+Cache invalidation must account for relevant editor state.
+
+______________________________________________________________________
+
+# 9. Runner
+
+A Runner describes a language, runtime, framework, or ecosystem.
+
+Example:
+
+```lua
+{
+    id = "go",
+
+    filetypes = {
+        "go",
+    },
+
+    project = {
+        markers = {
+            "go.mod",
+        },
+    },
+
+    tasks = {
+        {
+            id = "go.run",
+            name = "Run",
+            kind = "run",
+            command = "go run $file",
+        },
+
+        {
+            id = "go.build",
+            name = "Build",
+            kind = "build",
+            command = "go build $file",
+        },
+
+        {
+            id = "go.test",
+            name = "Test",
+            kind = "test",
+            command = "go test ./...",
+        },
+    },
+}
+```
+
+A Runner MUST NOT own process lifecycle.
+
+______________________________________________________________________
+
+# 10. Runner Resolution
+
+The resolution pipeline is:
+
+```text
+Current Editor Context
+        ↓
+Candidate Runners
+        ↓
+Runner Detection
+        ↓
+Available Tasks
+        ↓
+Task Conditions
+        ↓
+Resolved Tasks
+        ↓
+Presentation
+```
+
+The system should avoid expensive detection for every runner when cheap signals can narrow the candidates.
+
+Potential signals:
+
+```text
+filetype
+extension
+project markers
+known files
+available executables
+project configuration
+current file location
+```
+
+______________________________________________________________________
+
+# 11. Zero-Config Resolution
+
+Zero-config behavior is implemented through built-in runners.
+
+Conceptually:
+
+```text
+Built-in Runner Definitions
+        ↓
+Runner Registry
+        ↓
+Context Resolution
+        ↓
+Task Resolution
+```
+
+User configuration modifies or extends this behavior.
+
+Configuration does not replace the core registry.
+
+______________________________________________________________________
+
+# 12. Configuration Precedence
+
+Unless a future ADR explicitly changes this:
+
+```text
+Built-in defaults
+        ↓
+User configuration
+        ↓
+Project configuration
+        ↓
+Runtime registration
+```
+
+More specific configuration wins over less specific configuration.
+
+The merge semantics must be deterministic and documented.
+
+______________________________________________________________________
+
+# 13. Project Detection
+
+Project detection provides a project context.
+
+Examples of markers:
+
+```text
+package.json
+go.mod
+Cargo.toml
+pom.xml
+build.gradle
+.git
+```
+
+Project detection must not execute arbitrary commands.
+
+It should primarily inspect filesystem/editor state.
+
+______________________________________________________________________
+
+# 14. Project Configuration
+
+Project-local configuration may define custom tasks and overrides.
+
+Project configuration is executable Lua when `.code-runner.lua` is used.
+
+This must be treated as trusted project code.
+
+The plugin must not pretend that arbitrary Lua can be safely sandboxed by superficial restrictions.
+
+______________________________________________________________________
+
+# 15. Execution Engine
+
+The Execution Engine is the only component responsible for turning a resolved Command into an Execution.
+
+Responsibilities:
+
+```text
+create execution
+start process
+stream output
+track process
+cancel process
+complete execution
+produce result
+emit lifecycle events
+```
+
+It must not decide:
+
+```text
+which task the user wants
+how the picker looks
+how diagnostics are displayed
+```
+
+______________________________________________________________________
+
+# 16. Terminal
+
+Terminal is an execution/output adapter.
+
+It is not the execution engine.
+
+The intended relationship is:
+
+```text
+Execution Engine
+      ↓
+Process / Output
+      ↓
+Terminal Adapter
+      ↓
+Terminal UI
+```
+
+A future headless execution mode must be possible without requiring terminal UI.
+
+______________________________________________________________________
+
+# 17. Workflow
+
+A Workflow composes tasks.
+
+Example:
+
+```text
+build
+  ↓
+test
+  ↓
+run
+```
+
+Workflow does not implement process execution itself.
+
+Instead:
+
+```text
+Workflow
+   ↓
+Task A
+   ↓
+Execution Engine
+
+Task B
+   ↓
+Execution Engine
+```
+
+This guarantees consistent behavior for:
+
+- output
+- cancellation
+- history
+- events
+- diagnostics
+- errors
+- result handling
+
+______________________________________________________________________
+
+# 18. Diagnostics
+
+Execution output is not diagnostics.
+
+The intended pipeline is:
+
+```text
+Process Output
+      ↓
+Output Parser
+      ↓
+Diagnostic[]
+      ↓
+Diagnostics Adapter
+```
+
+Quickfix is another presentation adapter:
+
+```text
+Diagnostic[]
+      ↓
+Quickfix Adapter
+```
+
+Parsers must not directly manipulate quickfix or diagnostic state.
+
+______________________________________________________________________
+
+# 19. History
+
+History records executions.
+
+A history entry should preserve enough information to understand and reproduce a previous execution.
+
+At minimum:
+
+```text
+execution id
+task id
+command
+cwd
+context where relevant
+result
+timestamp
+```
+
+History must not become the source of truth for task definitions.
+
+______________________________________________________________________
+
+# 20. Last Run
+
+`run_last` should reference task identity rather than blindly replaying an old command.
+
+Preferred:
+
+```lua
+{
+    task_id = "go.test",
+    context = ...,
+}
+```
+
+Then:
+
+```text
+resolve task
+      ↓
+resolve current command
+      ↓
+execute
+```
+
+This allows task definitions to evolve.
+
+______________________________________________________________________
+
+# 21. Events
+
+Events communicate lifecycle changes.
+
+Internal conceptual events:
+
+```text
+execution.created
+execution.started
+execution.output
+execution.completed
+execution.failed
+execution.cancelled
+```
+
+Neovim-specific autocmds are adapters over this event model.
+
+______________________________________________________________________
+
+# 22. Error Handling
+
+Errors should be categorized.
+
+At minimum:
+
+```text
+configuration error
+resolution error
+command error
+process error
+execution failure
+adapter error
+```
+
+A process exiting with a non-zero code is normally an execution result, not necessarily an internal plugin error.
+
+______________________________________________________________________
+
+# 23. Performance
+
+Performance priorities:
+
+1. low startup cost
+1. lazy loading
+1. cheap context resolution
+1. cached expensive detection
+1. avoid loading unnecessary runners
+1. avoid scanning the filesystem repeatedly
+1. avoid process spawning for detection unless explicitly justified
+
+The number of supported runners should not linearly increase startup cost.
+
+______________________________________________________________________
+
+# 24. Architectural Invariants
+
+These are non-negotiable unless intentionally changed through an ADR.
+
+### Invariant 1
+
+Adding a runner must not require modifying the execution engine.
+
+### Invariant 2
+
+Changing the picker must not require modifying Task.
+
+### Invariant 3
+
+Changing terminal UI must not require modifying Execution.
+
+### Invariant 4
+
+Changing diagnostics presentation must not require modifying parsers.
+
+### Invariant 5
+
+Workflow must use the same Execution Engine as standalone tasks.
+
+### Invariant 6
+
+Task identity must not depend on presentation labels.
+
+### Invariant 7
+
+Core must not depend directly on Neovim UI APIs.
+
+### Invariant 8
+
+Zero-config behavior must be provided by normal architecture, not special-case execution paths.
+
+### Invariant 9
+
+Expanding language support must primarily add runner definitions.
+
+### Invariant 10
+
+No architectural abstraction may be introduced without a documented reason.

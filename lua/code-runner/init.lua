@@ -185,7 +185,13 @@ function M.run_last()
 
 	-- Repetición fiel de un "Run test": el comando quedó guardado con su contexto
 	if last_choice.cmd then
-		execute_action(last_choice.cmd, last_choice.vars or { ["$testName"] = last_choice.test }, last_choice.cwd, last_choice.lang, last_choice.choice)
+		execute_action(
+			last_choice.cmd,
+			last_choice.vars or { ["$testName"] = last_choice.test },
+			last_choice.cwd,
+			last_choice.lang,
+			last_choice.choice
+		)
 		return
 	end
 

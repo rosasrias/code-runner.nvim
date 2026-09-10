@@ -133,7 +133,145 @@ T.it("reset limpia las tasks", function()
   T.falsy(workflow.list().t, "sin tasks tras reset")
 end)
 
-T.section("workflow: pasos headless reales (jobstart)")
+T.section("workflow: parallel register")
+
+T.it("parallel=true normaliza a #steps", function()
+  clean()
+  workflow.register({ name = "t", steps = { "a", "b", "c" }, parallel = true })
+  T.eq(3, workflow.list().t.parallel, "true → número de pasos")
+end)
+
+T.it("parallel=N acota la concurrencia y conserva el número", function()
+  clean()
+  workflow.register({ name = "t", steps = { "a", "b", "c" }, parallel = 2 })
+  T.eq(2, workflow.list().t.parallel, "se conserva el límite")
+end)
+
+T.it("parallel ausente/false queda falsy (secuencial)", function()
+  clean()
+  workflow.register({ name = "t", steps = { "a", "b" } })
+  T.falsy(workflow.list().t.parallel, "default secuencial")
+end)
+
+T.section("workflow: parallel execute (núcleo síncrono)")
+
+T.it("ejecuta todos los pasos sin stop_on_fail", function()
+  clean()
+  local called = {}
+  local n = 100 -- ejercicio de la ruta con vim.wait
+  local function run_step(cmd)
+    table.insert(called, cmd)
+    vim.wait(1)
+    return 0
+  end
+  local spec = workflow.list().t or { name = "t", steps = {} }
+
+  -- registro con parallel=true
+  workflow.register({ name = "t", steps = { "a", "b", "c" }, parallel = true })
+  local res = workflow.execute(workflow.list().t, run_step)
+
+  T.eq(3, #called, "se ejecutan los 3 pasos")
+  T.truthy(res.ok, "todo ok")
+  T.eq(3, #res.results, "hay resultado por cada paso")
+end)
+
+T.it("con un fallo y stop_on_fail reporta ok=false", function()
+  clean()
+  workflow.register({ name = "t", steps = { "ok", "bad", "never" }, parallel = true })
+
+  local res = workflow.execute(workflow.list().t, function(cmd)
+    vim.wait(1)
+    return cmd == "bad" and 2 or 0
+  end)
+
+  T.falsy(res.ok, "fallo detectado")
+  T.eq(3, #res.results, "en paralelo corren todos los pasos lanzados")
+end)
+
+T.section("workflow: parallel.run con jobstart real")
+
+if vim.fn.executable "python" == 1 or PLATFORM_WIN then
+  T.it("on_done llega con todos los resultados correctos", function()
+    clean()
+    local base = PLATFORM_WIN and "cmd /c exit" or "sh -c 'exit'"
+    -- usamos comandos con exit code determinista
+    local ok_cmd = PLATFORM_WIN and "cmd /c exit 0" or "true"
+    local bad_cmd = PLATFORM_WIN and "cmd /c exit 3" or "false"
+    local steps = { ok_cmd, ok_cmd, bad_cmd, ok_cmd }
+    workflow.register({ name = "par", steps = steps, parallel = true })
+
+    local done_once = false
+    local final = nil
+
+    workflow.run("par", function(result)
+      final = result
+      done_once = true
+    end)
+
+    -- espera a que el callback corra
+    local deadline = vim.loop.hrtime() + 5e9
+    while not done_once and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+
+    T.truthy(done_once, "on_done se llama")
+    if final then
+      T.eq(4, #final.results, "4 pasos corridos")
+      T.eq(0, final.results[1].code)
+      T.truthy(final.results[3].code ~= 0, "el tercer paso falló")
+      T.falsy(final.ok, "task fallada por el paso malo")
+    end
+  end)
+
+  T.it("parallel acotado (N) lanza máximo N a la vez", function()
+    clean()
+    local ok_cmd = PLATFORM_WIN and "cmd /c exit 0" or "true"
+    local steps = {}
+    for _ = 1, 6 do
+      steps[#steps + 1] = ok_cmd
+    end
+    workflow.register({ name = "bounded", steps = steps, parallel = 2 })
+
+    local done_once = false
+    local active = 0
+    local max_active = 0
+    local final = nil
+
+    local orig_run_step = workflow.run_step
+    workflow.run_step = function(cmd, cwd, on_exit)
+      active = active + 1
+
+      if active > max_active then
+        max_active = active
+      end
+
+      return orig_run_step(cmd, cwd, function(code)
+        active = active - 1
+        on_exit(code)
+      end)
+    end
+
+    workflow.run("bounded", function(result)
+      final = result
+      done_once = true
+    end)
+
+    local deadline = vim.loop.hrtime() + 5e9
+    while not done_once and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+
+    workflow.run_step = orig_run_step
+
+    T.truthy(done_once, "on_done se llama")
+    T.eq(2, max_active, "nunca más de 2 concurrentes")
+    T.truthy(final and final.ok, "todos los pasos OK")
+  end)
+else
+  T.skip("parallel jobstart", "necesita una shell real (python/cmd) para el E2E")
+end
+
+T.section("workflow: dispatch desde .code-runner.lua")
 
 if vim.fn.executable "python" == 1 or PLATFORM_WIN then
   T.it("un paso exitoso reporta exit 0", function()

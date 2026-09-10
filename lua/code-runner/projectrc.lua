@@ -30,6 +30,7 @@ local function register_tasks(tasks, root, key)
         name = task.name or name,
         steps = task.steps,
         stop_on_fail = task.stop_on_fail,
+        parallel = task.parallel,
         cwd = task.cwd or root,
         key = task.key or key,
       })

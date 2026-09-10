@@ -25,7 +25,9 @@ function M.skip(name, reason)
 end
 
 function M.eq(expected, actual, msg)
-  if expected ~= actual then
+  local eq = expected == actual
+    or (type(expected) == "table" and type(actual) == "table" and vim.deep_equal(expected, actual))
+  if not eq then
     error(
       (msg or "eq falló") .. "\n           esperado: " .. vim.inspect(expected) .. "\n           obtenido: "
         .. vim.inspect(actual),

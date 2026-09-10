@@ -1,57 +1,230 @@
-# ROADMAP V1.0 — code-runner.nvim
+# CodeRunner.nvim Roadmap
 
-Convención: `[x]` completado · `[~]` en progreso · `[ ]` pendiente.
-Regla de orden: no avanzar a una fase si la anterior arrastra problemas.
+The roadmap is organized around architectural maturity rather than feature quantity.
 
-## P0 — Estabilidad del core
+______________________________________________________________________
 
-- [x] Auditar arquitectura actual (sesión `.opencode/`, inspección completa)
-- [x] Crear contexto persistente `.opencode/` (README/ROADMAP/ARCHITECTURE/CHANGELOG/TODO)
-- [x] Crear `AGENTS.md`
-- [x] Estado central de ejecución (`idle|running|success|failed|cancelled`) + `state()` API
-- [x] Fix invocado por el estado: terminal reutilizada sin E95 / job anterior en marcha se cancela
-- [x] `:CodeRunStop` — cancelar el proceso activo del plugin (nunca procesos ajenos)
-- [x] `:CodeRunRestart` — detener y re-ejecutar la última acción
-- [x] Run Last robusto — `last_choice` se persiste (last.json) y se recarga en `setup`; `last_choice` en memoria queda como cache
-- [x] Revisar `shell.lua` — `wrap_command` respeta `&&` dentro de comillas (splitter quote-aware; `vim.split` naive lo rompía)
-- [x] Cache de contexto — `context.detect` cachea por `bufnr + changedtick + cursor + key`; evita re-parsear TS/regex en cada `:CodeRun`; `_clear_cache()` para tests
-- [x] Cleanup de temporales Java — el smart run registra su dir `tempname()` en el buffer; `terminal._on_exit` lo borra al terminar (éxito o error); `state.reset()`
+# P0 — Architecture Foundation
 
-## P1 — Extensibilidad
+Goal:
 
-- [x] Action registry (`register_action`: registrar/sobrescribir/deshabilitar/ordenar/tipo run|build|test|misc)
-- [x] API pública `require("code-runner"): run / run_last / stop / restart / state / context / register_action`
-- [x] Configuración por proyecto `.code-runner.lua` (tasks), carga segura y con defaults
-- [x] Custom tasks (`tasks.dev/build/test`) con variables de contexto (`$testName`/`$entry`/`$entryLine`) — sustituidas en el command y reproducidas por run_last/restart
-- [x] Profiles (Run/Build/Test/Debug/Release/Benchmark) — solo donde tengan sentido: presets opt-in (Rust `--release`, Go `-bench`, C/C++ `-O2`); `profiles.enabled=false` por defecto
+Create stable internal domain concepts.
 
-## P2 — Integraciones y pulido
+## Tasks
 
-- [x] `vim.diagnostic` para errores de build/test (manteniendo Quickfix; elegible) — nuevo `quickfix.style` (`quickfix`/`diagnostic`/`both`) + módulo `diagnostics.lua`
-- [x] `:checkhealth code-runner` — requiere/opcional/recomendada: deriva las herramientas del catálogo resuelto y solo revisa los lenguajes que el usuario usa (historial + buffer actual);   `glow` va como recomendada para markdown
-- [x] Events `CodeRunnerStart/Exit/Success/Failed/Cancelled` — autocmds User emitidos desde `state.lua` (un solo punto), opt-out con `events.enabled`; `Exit` cubre cualquier estado final
-- [x] Maven/Gradle Wrapper (`./mvnw` → `mvn`, `./gradlew` → `gradle`) + marcadores `pom.xml`/`build.gradle*` ya presentes — `shell.use_wrappers` en `terminal.open` (usa `cwd`); la auto-run de Java pasa el dir del pom como cwd
-- [x] Windows restante — quoting PowerShell quote-aware y acciones `.bat`/`.cmd`/`.ps1` ya estaban; se añade build C# con **msbuild/csc** (`compiled.cs_build_cmd`: `.sln`/`.csproj` → msbuild > dotnet build; `.cs` suelto → csc > dotnet single-file), cross-platform con fallback
+```text
+ARCH-001 Characterization tests
+ARCH-002 TaskSpec
+ARCH-003 CommandSpec
+ARCH-004 Result model
+ARCH-005 Execution model
+ARCH-006 Registry contracts
+ARCH-007 Dependency boundaries
+```
 
-**P2 completa** → pasar a P3 (V1.0).
+Exit criteria:
 
-## P3 — Task engine
+- Task is a first-class concept.
+- Execution is a first-class concept.
+- Commands have a normalized representation.
+- Core boundaries are documented.
+- Existing behavior remains covered by tests.
 
-- [x] Workflows básicos: ejecución secuencial `build → test → run`, stop-si-falla, resultado por etapa — nuevo `workflow.lua` (engine mínimo): tasks con `steps` en `.code-runner.lua` (o `register_task`), ejecución headless con jobstart (sin abrir terminal), stop_on_fail por defecto, resultado por etapa; `:CodeRunTask <nombre>` para invocarlas
-- [ ] Tareas paralelas/acotadas (no un scheduler gigante)
+______________________________________________________________________
 
-## P4 — Integraciones externas
+# P1 — Execution Core
 
-- [ ] VS Code tasks
-- [ ] DAP
-- [ ] Neotest
-- [ ] Otras integraciones según demanda
+Goal:
 
-## Notas
+Create one reliable execution engine.
 
-- NO agregar más lenguajes al catálogo por ahora (demanda real + mantenibilidad + tests antes).
-- NO MCPs/agentes/subagentes/orquestadores/servidores externos. El contexto persistente ES
-  `AGENTS.md` + `.opencode/`.
-- Feature creep: antes de una feature evaluar #1 objetivo #2 usuarios #3 complejidad
-  #4 mantenibilidad #5 tests #6 alternativa más simple.
-- V1.0 = estabilidad, no features infinitas. Workflows/DAP/Neotest pueden ir a V1.1+.
+## Tasks
+
+```text
+EXEC-001 Execution lifecycle
+EXEC-002 Process adapter
+EXEC-003 stdout/stderr streaming
+EXEC-004 cancellation
+EXEC-005 restart
+EXEC-006 result handling
+EXEC-007 execution events
+EXEC-008 history integration
+EXEC-009 terminal adapter integration
+```
+
+Exit criteria:
+
+Standalone tasks and future workflows can share the same execution engine.
+
+______________________________________________________________________
+
+# P2 — Runner Architecture
+
+Goal:
+
+Make language/ecosystem support modular.
+
+## Tasks
+
+```text
+RUN-001 Runner contract
+RUN-002 Runner registry
+RUN-003 Built-in runner loader
+RUN-004 Go migration
+RUN-005 Rust migration
+RUN-006 Python migration
+RUN-007 JavaScript/TypeScript migration
+RUN-008 Java migration
+RUN-009 remaining runner migration
+```
+
+The first few runners are architecture probes.
+
+Do not migrate everything blindly.
+
+If runner migration reveals a broken abstraction, stop and improve the abstraction first.
+
+Exit criteria:
+
+Adding a new runner normally requires adding runner code only.
+
+______________________________________________________________________
+
+# P3 — Contextual Zero-Config
+
+Goal:
+
+Make contextual resolution the primary product differentiator.
+
+## Tasks
+
+```text
+CTX-001 Context contract
+CTX-002 project context
+CTX-003 file context
+CTX-004 test context
+CTX-005 entrypoint context
+CTX-006 caching
+CTX-007 contextual task conditions
+CTX-008 project-aware task resolution
+```
+
+Exit criteria:
+
+The plugin can expose useful tasks based on:
+
+```text
+file
+filetype
+project
+test
+entrypoint
+```
+
+without user configuration.
+
+______________________________________________________________________
+
+# P4 — Advanced Tasks
+
+Goal:
+
+Expand task capabilities without changing the core execution model.
+
+Potential features:
+
+```text
+task parameters
+task variants
+profiles
+workflows
+task dependencies
+conditional tasks
+retry
+timeouts
+parallel execution
+DAG workflows
+```
+
+All advanced execution must use the same Execution Engine.
+
+______________________________________________________________________
+
+# P5 — Integrations
+
+Potential integrations:
+
+```text
+DAP
+Neotest
+statusline
+external task definitions
+project task import
+other Neovim ecosystem integrations
+```
+
+Integrations must be adapters.
+
+They must not become part of Core.
+
+______________________________________________________________________
+
+# P6 — v1.0 Hardening
+
+Goal:
+
+Prepare a stable release.
+
+Areas:
+
+```text
+API review
+documentation
+performance
+health checks
+error messages
+migration documentation
+test coverage
+platform validation
+Neovim compatibility
+release process
+```
+
+______________________________________________________________________
+
+# Feature Priority Rule
+
+A feature that increases the complexity of Core should be considered high-risk.
+
+Prefer implementing new capabilities as:
+
+```text
+Runner
+Task
+Context detector
+Parser
+Adapter
+Integration
+```
+
+rather than modifying Core.
+
+______________________________________________________________________
+
+# Anti-Roadmap
+
+The following are explicitly not priorities before the architecture stabilizes:
+
+```text
+more language count
+large UI redesign
+remote execution
+task marketplace
+plugin marketplace
+complex scripting DSL
+distributed execution
+```
+
+Feature count is not a v1.0 success metric.
+
+Architectural stability is.

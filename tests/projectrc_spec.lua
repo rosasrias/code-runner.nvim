@@ -60,6 +60,24 @@ T.it("carga .code-runner.lua y registra las tasks devueltas", function()
   T.truthy(found, "comando de la task presente")
 end)
 
+T.it("una task con steps en el dotfile preserva parallel", function()
+  clean()
+  local root = make_tree()
+  vim.fn.writefile({ "module demo" }, root .. "/go.mod")
+  vim.fn.writefile({
+    "return { tasks = {",
+    "  par = { steps = { 'a', 'b', 'c' }, parallel = 2 },",
+    "} }",
+  }, root .. "/.code-runner.lua")
+
+  T.truthy(projectrc.load("go", root))
+  local wf = require("code-runner.workflow").list()
+  T.truthy(wf.par, "task con steps en el motor")
+  T.eq(2, wf.par.parallel, "parallel se preserva desde el dotfile")
+
+  clean()
+end)
+
 T.it("es cacheada por raíz (no recarga ni re-registra)", function()
   clean()
   local root = make_tree()
