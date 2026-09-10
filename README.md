@@ -1,6 +1,6 @@
 # ⚡ code-runner.nvim
 
-![CI](https://img.shields.io/github/actions/workflow/status/rosasrias/code-runner.nvim/ci.yml?branch=main&label=CI)
+[![CI](https://github.com/rosasrias/code-runner.nvim/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/rosasrias/code-runner.nvim/actions/workflows/ci.yml)
 
 Runner de código para Neovim con selector de acciones (picker propio basado en [nvzone/volt](https://github.com/nvzone/volt), con fallback a `vim.ui.select`).
 
@@ -64,7 +64,7 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
 
 ```lua
 {
-  dir = "C:/Users/rosas/Documents/code/plugins/code-runner.nvim",
+  "rosasrias/code-runner.nvim",
   dependencies = { "nvzone/volt" }, -- opcional, para el picker
   opts = {
     ui = "auto", -- "volt" | "select" | "auto"
@@ -183,10 +183,10 @@ En el picker volt: `j/k` o flechas para moverte, `1-9` selección rápida, `<CR>
 
 ## Tests
 
-Suite propia sin dependencias externas (245 tests). Corre con:
+Suite propia sin dependencias externas (519 tests). Corre con:
 
 ```powershell
-nvim --headless -l tests/run.lua
+nvim --headless -u NONE -l tests/run.lua
 ```
 
 Cubre: sustitución de variables (`%`, `$fileBase`, `$binRun`, `$testName`, `$stem`, `$project`, `%l`, ...), wrapping de comandos PowerShell/bash, catálogo completo de acciones y orden estable (60+ lenguajes), overrides de usuario, internals de Java (package/source-root/fqcn), resolución por extensión/filetype, picker volt y fallback, detección de tests y entry points por lenguaje, detección de la raíz del proyecto (marcadores por lenguaje, globs, monorepo, `max_depth`), parsing de errores a quickfix (gcc, Maven, MSVC, ANSI, go FAIL), terminal (direcciones, título/winbar, flotante, autoclose opt-in, cierre con `q`, reuso de ventana y `:CodeRunStop`), historial persistente (dedupe, límites, archivos corruptos, integración con `:CodeRun`/`:CodeRunHistory`) y E2E que **compilan y ejecutan código real** (C, Java, Python — incluida una compilación con error validada contra el quickfix), y el **task engine (workflow)**: pasos secuenciales con stop-si-falla, resultado por etapa y ejecución headless real con `jobstart`. Los tests que requieren herramientas ausentes se marcan `SKIP` automáticamente.

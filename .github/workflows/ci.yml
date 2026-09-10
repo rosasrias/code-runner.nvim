@@ -30,4 +30,11 @@ jobs:
         run: nvim --headless -u NONE -l tests/run.lua
 
       - name: Comprobar que el working tree queda limpio
-        run: git status --porcelain
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree is dirty:"
+            git status --porcelain
+            git diff
+            exit 1
+          fi
