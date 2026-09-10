@@ -183,10 +183,10 @@ T.it("$binRun relativo lleva el prefijo del ejecutable según plataforma", funct
     local base = vim.fn.expand "%:p:r"
 
     shell.IS_WIN = true
-    T.eq('& "' .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "windows absoluto sin prefijo")
+    T.eq(norm('& "' .. base .. shell.EXE_SUFFIX .. '"'), norm(shell.substitute("$binRun")), "windows absoluto sin prefijo")
 
     shell.IS_WIN = false
-    T.eq('"' .. base .. shell.EXE_SUFFIX .. '"', shell.substitute("$binRun"), "unix absoluto sin prefijo")
+    T.eq(norm('"' .. base .. shell.EXE_SUFFIX .. '"'), norm(shell.substitute("$binRun")), "unix absoluto sin prefijo")
 
     shell.IS_WIN = IS_WIN_BACKUP
   end)
@@ -194,18 +194,18 @@ end)
 
 T.it("$binRun con ruta absoluta no duplica prefijo", function()
   with_absolute_buffer(function()
-    local base = vim.fn.expand "%:r"
+    local base = vim.fn.expand "%:p:r"
 
     shell.IS_WIN = true
-    T.eq('& "' .. base .. '.exe"', shell.substitute("$binRun"), "windows sin .\\")
+    T.eq(norm('& "' .. base .. '.exe"'), norm(shell.substitute("$binRun")), "windows sin .\\")
 
     -- En una máquina Unix EXE_SUFFIX sería "", aquí solo verificamos
     -- que NO se añade prefijo a una ruta absoluta
     shell.IS_WIN = false
     local out = shell.substitute("$binRun")
-    T.contains(out, base, "usa la ruta absoluta tal cual")
-    T.falsy(out:find('"./', 1, true), "sin ./ delante de ruta absoluta")
-    T.falsy(out:find('"\\.\\', 1, true), "sin .\\ delante de ruta absoluta")
+    T.contains(norm(out), norm(base), "usa la ruta absoluta tal cual")
+    T.falsy(norm(out):find('"./', 1, true), "sin ./ delante de ruta absoluta")
+    T.falsy(norm(out):find('"\\.\\', 1, true), "sin .\\ delante de ruta absoluta")
 
     shell.IS_WIN = IS_WIN_BACKUP
   end)
