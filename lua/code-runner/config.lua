@@ -33,10 +33,10 @@ M.defaults = {
     hl_title = "ExBlue",
     hl_status_ok = "ExGreen",
     hl_status_err = "ExYellow",
-    -- Fondo de la ventana de la terminal: por default iguala al de NvimTree
-    -- (NvimTreeNormal usa darker_black, más oscuro que el Normal del editor).
+    -- Fondo de la ventana de la terminal: por default igual al del título
+    -- (CodeRunnerTermTitle), para que título y resultado se vean uniformes.
     -- Vacío ("") desactiva el override y deja el fondo Normal del editor.
-    winhighlight = "Normal:NvimTreeNormal,NormalNC:NvimTreeNormalNC,NormalFloat:NvimTreeNormal,FloatBorder:NvimTreeWinSeparator,EndOfBuffer:NvimTreeEndOfBuffer,WinSeparator:NvimTreeWinSeparator",
+    winhighlight = "Normal:CodeRunnerTermTitle,NormalNC:CodeRunnerTermTitle,NormalFloat:CodeRunnerTermTitle,FloatBorder:CodeRunnerTermTitle,EndOfBuffer:CodeRunnerTermTitle,WinSeparator:CodeRunnerTermTitle",
     -- Cerrar la terminal al terminar con éxito (exit code 0).
     -- Con false (default) la terminal se queda abierta, muestra la salida y
     -- cierra con "q"; con true se cierra sola cuando el proceso termina OK.

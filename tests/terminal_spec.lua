@@ -323,20 +323,20 @@ T.it("_on_exit también limpia cuando el job falla (código != 0)", function()
 end)
 
 
-T.section("terminal: fondo igual al de NvimTree")
+T.section("terminal: fondo igual al del titulo")
 
-T.it("_open_window aplica winhighlight de NvimTree a la terminal", function()
+T.it("_open_window aplica winhighlight del titulo a la terminal", function()
   vim.cmd "only"
   terminal._open_window "horizontal"
 
   local win = vim.api.nvim_get_current_win()
   local winhl = vim.wo[win].winhighlight
-  T.truthy(winhl:find("NvimTreeNormal", 1, true), "usa el fondo de NvimTree")
+  T.truthy(winhl:find("CodeRunnerTermTitle", 1, true), "usa el fondo del titulo")
 
   clean_windows()
 end)
 
-T.it("winhighlight vacio desactiva el fondo NvimTree", function()
+T.it("winhighlight vacio desactiva el fondo del titulo", function()
   vim.cmd "only"
   local prev = config.options.terminal.winhighlight
   config.options.terminal.winhighlight = ""
