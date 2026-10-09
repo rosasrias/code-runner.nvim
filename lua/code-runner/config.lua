@@ -33,10 +33,10 @@ M.defaults = {
     hl_title = "ExBlue",
     hl_status_ok = "ExGreen",
     hl_status_err = "ExYellow",
-    -- Fondo de la ventana de la terminal: por default igual al del título
-    -- (CodeRunnerTermTitle), para que título y resultado se vean uniformes.
-    -- Vacío ("") desactiva el override y deja el fondo Normal del editor.
-    winhighlight = "Normal:CodeRunnerTermTitle,NormalNC:CodeRunnerTermTitle,NormalFloat:CodeRunnerTermTitle,FloatBorder:CodeRunnerTermTitle,EndOfBuffer:CodeRunnerTermTitle,WinSeparator:CodeRunnerTermTitle",
+    -- Fondo de la ventana de la terminal: por default solo el bg del título
+    -- (grupo CodeRunnerTermBg, derivado de CodeRunnerTermTitle). El texto
+    -- no se toca. Vacío ("") desactiva el override y deja el fondo Normal.
+    winhighlight = "Normal:CodeRunnerTermBg,NormalNC:CodeRunnerTermBg,NormalFloat:CodeRunnerTermBg,FloatBorder:CodeRunnerTermBg,EndOfBuffer:CodeRunnerTermBg,WinSeparator:CodeRunnerTermBg",
     -- Cerrar la terminal al terminar con éxito (exit code 0).
     -- Con false (default) la terminal se queda abierta, muestra la salida y
     -- cierra con "q"; con true se cierra sola cuando el proceso termina OK.

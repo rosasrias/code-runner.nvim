@@ -322,7 +322,6 @@ T.it("_on_exit también limpia cuando el job falla (código != 0)", function()
   clean_windows()
 end)
 
-
 T.section("terminal: fondo igual al del titulo")
 
 T.it("_open_window aplica winhighlight del titulo a la terminal", function()
@@ -331,10 +330,24 @@ T.it("_open_window aplica winhighlight del titulo a la terminal", function()
 
   local win = vim.api.nvim_get_current_win()
   local winhl = vim.wo[win].winhighlight
-  T.truthy(winhl:find("CodeRunnerTermTitle", 1, true), "usa el fondo del titulo")
+  T.truthy(winhl:find("CodeRunnerTermBg", 1, true), "usa el fondo del titulo")
 
   clean_windows()
 end)
+
+  T.it("solo aplica el bg del titulo: el texto no se toca", function()
+    vim.cmd "only"
+    vim.api.nvim_set_hl(0, "CodeRunnerTermTitle", { fg = "#000000", bg = "#61afef" })
+    terminal._open_window "horizontal"
+
+    local _, title_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermTitle", link = true })
+    local ok, bg_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermBg" })
+    T.truthy(ok and bg_hl.bg, "grupo de fondo definido")
+    T.eq(title_hl.bg, bg_hl.bg, "bg igual al del titulo")
+    T.eq(nil, bg_hl.fg, "sin fg: el texto no se toca")
+
+    clean_windows()
+  end)
 
 T.it("winhighlight vacio desactiva el fondo del titulo", function()
   vim.cmd "only"

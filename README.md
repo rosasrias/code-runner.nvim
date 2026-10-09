@@ -77,7 +77,7 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
       hl_title = "ExBlue", -- color del título (grupos "Ex*" del tema ecotic)
       hl_status_ok = "ExGreen", -- estado "✓ terminó OK · q cierra"
       hl_status_err = "ExYellow", -- estado "✗ error N · q cierra"
-      winhighlight = "Normal:CodeRunnerTermTitle,...", -- fondo = titulo (uniforme); "" = Normal del editor
+      winhighlight = "Normal:CodeRunnerTermBg,...", -- solo bg del titulo (texto intacto); "" = Normal del editor
       autoclose = false, -- false: queda abierta al terminar, cierra con q; true: se cierra sola si termina OK
     },
     autosave = true,

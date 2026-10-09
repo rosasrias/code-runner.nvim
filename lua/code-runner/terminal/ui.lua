@@ -17,6 +17,19 @@ function M._apply_term_bg(win)
   if hl == nil then
     return
   end
+  if hl ~= "" then
+    -- Solo el fondo del titulo: resuelve su bg efectivo y lo aplica en un
+    -- grupo propio sin fg, asi el texto de la terminal no se toca. Se
+    -- resuelve en cada apertura: sigue al tema (incluye recargas) y no
+    -- depende de base46. Sin bg en el titulo, el grupo queda vacio y la
+    -- terminal usa su fondo normal.
+    local ok, title_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermTitle", link = true })
+    if ok and title_hl and title_hl.bg then
+      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = title_hl.bg })
+    else
+      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", {})
+    end
+  end
   -- "" limpia el heredado del split (los splits heredan winhighlight).
   vim.wo[win].winhighlight = hl
 end
