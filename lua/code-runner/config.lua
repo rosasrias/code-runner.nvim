@@ -25,7 +25,7 @@ M.defaults = {
     },
     -- Título de la ventana de la terminal (winbar en splits, título en float).
     -- Se le concatena la acción elegida (Run/Build) coloreada según su icono.
-    title = "⚡ CodeRunner · Terminal",
+    title = " 󰆍 CodeRunner",
     -- El plugin expone sus propios grupos de resaltado (CodeRunnerTermTitle,
     -- CodeRunnerTermOk, CodeRunnerTermErr, CodeRunnerActionRun/Build/Misc) que
     -- por default enlazan a los colores de abajo. Vos podés personalizarlos en

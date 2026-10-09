@@ -73,7 +73,7 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
       height = 12,
       vertical_width = 45,
       float = { width = 0.8, height = 0.6 }, -- fracciones del editor
-      title = "⚡ CodeRunner · Terminal", -- título del float / winbar de los splits
+      title = " CodeRunner", -- título del float / winbar de los splits
       hl_title = "ExBlue", -- color del título (grupos "Ex*" del tema ecotic)
       hl_status_ok = "ExGreen", -- estado "✓ terminó OK · q cierra"
       hl_status_err = "ExYellow", -- estado "✗ error N · q cierra"
@@ -156,7 +156,7 @@ personalizás en un solo lugar desde tu capa de highlights:
 | `CodeRunnerActionRun` | `picker.hl_run` | ícono+acción con ícono de ejecutar |
 | `CodeRunnerActionBuild` | `picker.hl_build` | ícono+acción con ícono de compilar |
 | `CodeRunnerActionMisc` | `picker.hl_misc` | otras acciones / picker sin ícono |
-| `CodeRunnerTermTitle` | `terminal.hl_title` | título `⚡ CodeRunner · Terminal` |
+| `CodeRunnerTermTitle` | `terminal.hl_title` | titulo ` CodeRunner` |
 | `CodeRunnerTermOk` | `terminal.hl_status_ok` | estado `✓ terminó OK · q cierra` |
 | `CodeRunnerTermErr` | `terminal.hl_status_err` | estado `✗ error N · q cierra` |
 | `CodeRunnerExitOk` | `terminal.hl_exit_ok` | `[Process exited 0]` (azul) |
