@@ -320,6 +320,287 @@ T.it("setup recarga la última ejecución persistida (sobrevive al reinicio)", f
   pcall(os.remove, file)
 end)
 
+T.section("init: identidad task_id en historial y last (EXEC-009 slice 2)")
+
+T.it("build_run con tracking guarda task_id en historial y last", function()
+  local terminal = require "code-runner.terminal"
+  local tracking = require "code-runner.terminal.tracking"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+  local last = require "code-runner.last"
+
+  local f = tmpdir .. "/identity.lua"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  -- historial y last aislados
+  local saved_hist, saved_last = history._data_file, last._data_file
+  local htmp, ltmp = os.tmpname(), os.tmpname()
+  history._data_file, last._data_file = htmp, ltmp
+  tracking.reset()
+
+  -- open simulado con el contrato nuevo: devuelve exec_id y trackea
+  local orig_select, orig_open = picker.select, terminal.open
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function(cmd, _, cwd, label)
+    return tracking.start(cmd, "lua", label)
+  end
+
+  local ok = pcall(cr.build_run)
+  T.truthy(ok, "build_run no lanza")
+
+  local items = history.list()
+  T.eq(1, #items)
+  T.truthy(items[1].task_id, "el historial lleva task_id")
+  T.truthy(items[1].task_id:find("^lua%.", 1) == 1, "derivado de la key")
+
+  local persisted = last.get()
+  T.truthy(persisted and persisted.task_id, "last lleva task_id")
+  T.eq(items[1].task_id, persisted.task_id, "misma identidad en ambos")
+
+  picker.select, terminal.open = orig_select, orig_open
+  history._data_file, last._data_file = saved_hist, saved_last
+  pcall(os.remove, htmp)
+  pcall(os.remove, ltmp)
+  tracking.reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("build_run sin tracking registra legacy sin identidad", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+
+  local f = tmpdir .. "/identity_legacy.lua"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  local saved_hist = history._data_file
+  local htmp = os.tmpname()
+  history._data_file = htmp
+  require("code-runner.terminal.tracking").reset()
+
+  -- open stub legacy: devuelve nil (sin tracking, p.ej. chain &&)
+  local orig_select, orig_open = picker.select, terminal.open
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function()
+    return nil
+  end
+
+  local ok = pcall(cr.build_run)
+  T.truthy(ok, "build_run no lanza")
+
+  local items = history.list()
+  T.eq(1, #items)
+  T.eq(nil, items[1].task_id, "legacy sin identidad, como antes")
+
+  picker.select, terminal.open = orig_select, orig_open
+  history._data_file = saved_hist
+  pcall(os.remove, htmp)
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.section("init: resolución operativa por task_id (EXEC-009 slice 3)")
+
+-- build_run con tracking simulado + comando que evoluciona entre lanzamientos.
+local function build_with_tracking(ext, custom_id, custom_cmd)
+  local terminal = require "code-runner.terminal"
+  local tracking = require "code-runner.terminal.tracking"
+  local picker = require "code-runner.picker"
+
+  local f = tmpdir .. "/slice3." .. ext
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  require("code-runner.actions.registry").reset()
+  cr.register_action { id = custom_id, filetypes = { "lua" }, kind = "run", command = custom_cmd }
+
+  local orig_select, orig_open = picker.select, terminal.open
+  local opened = {}
+  picker.select = function(items, _, cb)
+    for _, l in ipairs(items) do
+      if l:find(custom_id, 1, true) then
+        cb(l)
+        return
+      end
+    end
+  end
+  terminal.open = function(cmd, _, cwd, label)
+    table.insert(opened, cmd)
+    return tracking.start(cmd, "lua", label)
+  end
+
+  pcall(cr.build_run)
+
+  picker.select, terminal.open = orig_select, orig_open
+  return opened
+end
+
+T.it("run_last usa la plantilla vigente, no el comando guardado", function()
+  local history = require "code-runner.history"
+  local last = require "code-runner.last"
+  local terminal = require "code-runner.terminal"
+  local tracking = require "code-runner.terminal.tracking"
+
+  local saved_hist, saved_last = history._data_file, last._data_file
+  history._data_file, last._data_file = os.tmpname(), os.tmpname()
+  tracking.reset()
+
+  build_with_tracking("lua", "op_evolve_run", "mytool --opt A")
+
+  -- la plantilla evoluciona (mismo id, nuevo comando)
+  cr.register_action { id = "op_evolve_run", filetypes = { "lua" }, kind = "run", command = "mytool --opt B" }
+
+  local opened = {}
+  local orig_open = terminal.open
+  terminal.open = function(cmd)
+    table.insert(opened, cmd)
+    return nil
+  end
+
+  local ok = pcall(cr.run_last)
+  terminal.open = orig_open
+
+  T.truthy(ok, "run_last no lanza")
+  T.eq(1, #opened)
+  T.truthy(opened[1]:find("--opt B", 1, true), "plantilla vigente, no replay ciego")
+
+  history._data_file, last._data_file = saved_hist, saved_last
+  tracking.reset()
+  require("code-runner.actions.registry").reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("run_last con tarea eliminada cae al replay legacy sin romper", function()
+  local terminal = require "code-runner.terminal"
+  local tracking = require "code-runner.terminal.tracking"
+
+  tracking.reset()
+  build_with_tracking("lua", "op_gone_run", "mytool --opt A")
+  require("code-runner.actions.registry").reset() -- la tarea ya no existe
+
+  local opened, notified = {}, {}
+  local orig_open, orig_notify = terminal.open, terminal.notify
+  terminal.open = function(cmd)
+    table.insert(opened, cmd)
+    return nil
+  end
+  terminal.notify = function(msg, level)
+    table.insert(notified, { msg = msg, level = level })
+  end
+
+  local ok = pcall(cr.run_last)
+
+  terminal.open, terminal.notify = orig_open, orig_notify
+  T.truthy(ok, "nunca falla duro")
+  -- legacy: reejecuta el comando guardado o avisa que la acción no existe
+  T.truthy(#opened == 1 or #notified >= 1, "fallback explícito")
+
+  tracking.reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("run_history con status failed re-ejecuta igual (no es autoridad viva)", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+
+  local saved_hist = history._data_file
+  history._data_file = os.tmpname()
+  history.clear()
+  history.add("pytest -q", "C:/p", "py", { status = "failed" })
+
+  local orig_select, orig_open = picker.select, terminal.open
+  local opened = {}
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function(cmd)
+    table.insert(opened, cmd)
+    return nil
+  end
+
+  pcall(cr.run_history)
+
+  picker.select, terminal.open = orig_select, orig_open
+  T.eq(1, #opened, "el status registrado no bloquea")
+  T.eq("pytest -q", opened[1])
+
+  history._data_file = saved_hist
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("run_history con task_id desconocida reejecuta el comando guardado", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+
+  local saved_hist = history._data_file
+  history._data_file = os.tmpname()
+  history.clear()
+  history.add("pytest -q", "C:/p", "py", { task_id = "py.noexiste", vars = { ["$x"] = "1" } })
+
+  local orig_select, orig_open = picker.select, terminal.open
+  local opened = {}
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function(cmd)
+    table.insert(opened, cmd)
+    return nil
+  end
+
+  local ok = pcall(cr.run_history)
+
+  picker.select, terminal.open = orig_select, orig_open
+  T.truthy(ok, "nunca falla duro")
+  T.eq(1, #opened)
+  T.eq("pytest -q", opened[1], "fallback al comando guardado")
+
+  history._data_file = saved_hist
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("re-lanzar desde historial crea ejecución nueva (no reutiliza id)", function()
+  local terminal = require "code-runner.terminal"
+  local tracking = require "code-runner.terminal.tracking"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+
+  local saved_hist = history._data_file
+  history._data_file = os.tmpname()
+  history.clear()
+  tracking.reset()
+
+  local orig_select, orig_open = picker.select, terminal.open
+  local seen_ids = {}
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function(cmd, _, cwd, label)
+    local id = tracking.start(cmd, "py", label)
+    table.insert(seen_ids, id)
+    return id
+  end
+
+  history.add("pytest -q", "C:/p", "py")
+  pcall(cr.run_history)
+  pcall(cr.run_history)
+
+  picker.select, terminal.open = orig_select, orig_open
+  T.eq(2, #seen_ids)
+  T.truthy(seen_ids[1] ~= seen_ids[2], "invariante 1: execution_id nunca se reutiliza")
+  T.eq(seen_ids[2], history.list()[1].execution_id, "el historial apunta a la última")
+
+  history._data_file = saved_hist
+  tracking.reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
 T.section("init: stop()")
 
 T.it("stop sin ejecución en marcha es un no-op (no rompe nada)", function()

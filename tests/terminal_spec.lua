@@ -415,4 +415,200 @@ T.it("winhighlight vacio desactiva el fondo del titulo", function()
   clean_windows()
 end)
 
+T.section("terminal: tracking Engine sobre el job real (EXEC-009 slice 1)")
+
+local function clean_runner_buffers()
+  vim.cmd "only"
+  for _, b in ipairs(vim.api.nvim_list_bufs()) do
+    if terminal._has_marker(b) or vim.api.nvim_buf_get_name(b):find("code%-runner", 1) then
+      pcall(vim.api.nvim_buf_delete, b, { force = true })
+    end
+  end
+end
+
+T.it("open() registra una Execution running con task_id estable", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  state.reset()
+
+  terminal.open("echo 'exec tracking'", "horizontal", nil, "Run")
+
+  T.eq("running", state.get().status)
+  local exec = terminal.get_execution()
+  T.truthy(exec, "hay Execution en seguimiento")
+  T.eq("running", exec.status)
+  T.truthy(exec.task_id and exec.task_id ~= "", "task_id estable, no el label crudo")
+  T.falsy(exec.task_id:find("▶", 1, true), "sin iconos de presentación en el id")
+
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("_on_exit con exec_id obsoleto no toca la Execution nueva", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local quickfix = require "code-runner.quickfix"
+  local orig = quickfix.handle
+  quickfix.handle = function() return 0 end
+  state.reset()
+
+  terminal.open("echo 'nueva'", "horizontal", nil, "Run")
+  local current = terminal.get_execution()
+  T.truthy(current)
+
+  local buf = vim.fn.bufadd ""
+  terminal._on_exit(buf, 1, nil, state.get().run_id, (current.id or 0) + 99999)
+
+  local after = terminal.get_execution()
+  T.eq("running", after.status, "el on_exit obsoleto no finaliza la nueva")
+  T.eq(current.id, after.id)
+
+  quickfix.handle = orig
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("_on_exit con exec_id correcto finaliza y expone eventos", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local quickfix = require "code-runner.quickfix"
+  local orig = quickfix.handle
+  quickfix.handle = function() return 0 end
+  state.reset()
+
+  terminal.open("echo 'fin ok'", "horizontal", nil, "Run")
+  local current = terminal.get_execution()
+  T.truthy(current)
+
+  local buf = vim.fn.bufadd ""
+  terminal._on_exit(buf, 0, nil, state.get().run_id, current.id)
+
+  local after = terminal.get_execution()
+  T.eq("success", after.status)
+  T.eq(0, after.result.code)
+  T.eq("success", state.get().status, "path legacy intacto")
+
+  local evnames = {}
+  for _, e in ipairs(terminal.last_events()) do
+    evnames[#evnames + 1] = e.name
+  end
+  T.eq({ "CodeRunnerSuccess", "CodeRunnerExit" }, evnames)
+
+  quickfix.handle = orig
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.section("terminal: fuente única de eventos y Result (EXEC-009 slice 4)")
+
+local function listen_count_4(pattern, store)
+  vim.api.nvim_create_autocmd("User", {
+    pattern = pattern,
+    callback = function()
+      store[#store + 1] = pattern
+    end,
+  })
+end
+
+T.it("_on_exit trackeado emite Success+Exit una sola vez", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local quickfix = require "code-runner.quickfix"
+  local orig = quickfix.handle
+  quickfix.handle = function() return 0 end
+  state.reset()
+
+  local seen = {}
+  listen_count_4("CodeRunnerSuccess", seen)
+  listen_count_4("CodeRunnerExit", seen)
+
+  terminal.open("echo 'slice4'", "horizontal", nil, "Run")
+  local current = terminal.get_execution()
+  T.truthy(current)
+
+  local buf = vim.fn.bufadd ""
+  terminal._on_exit(buf, 0, nil, state.get().run_id, current.id)
+
+  T.eq("success", state.get().status, "el espejo legacy conserva el estado")
+  T.eq(0, state.get().code, "el Result llega al estado")
+
+  local success, exit = 0, 0
+  for _, p in ipairs(seen) do
+    if p == "CodeRunnerSuccess" then
+      success = success + 1
+    elseif p == "CodeRunnerExit" then
+      exit = exit + 1
+    end
+  end
+  T.eq(1, success, "sin duplicar Success")
+  T.eq(1, exit, "sin duplicar Exit")
+
+  quickfix.handle = orig
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("_close_current emite Cancelled+Exit una sola vez", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  state.reset()
+
+  local seen = {}
+  listen_count_4("CodeRunnerCancelled", seen)
+  listen_count_4("CodeRunnerExit", seen)
+
+  terminal.open("echo 'cerrar'", "horizontal", nil, "Run")
+  T.eq("running", state.get().status)
+
+  terminal._close_current(vim.api.nvim_get_current_buf())
+
+  T.eq("cancelled", state.get().status)
+
+  local cancelled, exit = 0, 0
+  for _, p in ipairs(seen) do
+    if p == "CodeRunnerCancelled" then
+      cancelled = cancelled + 1
+    elseif p == "CodeRunnerExit" then
+      exit = exit + 1
+    end
+  end
+  T.eq(1, cancelled, "sin duplicar Cancelled")
+  T.eq(1, exit, "sin duplicar Exit")
+
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("quickfix sigue consumiendo el exit en el path trackeado", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local quickfix = require "code-runner.quickfix"
+  local orig = quickfix.handle
+  local calls = {}
+  quickfix.handle = function(buf, code, cwd)
+    table.insert(calls, { code = code })
+    return 0
+  end
+  state.reset()
+
+  terminal.open("echo 'qf'", "horizontal", nil, "Run")
+  local current = terminal.get_execution()
+
+  local buf = vim.fn.bufadd ""
+  terminal._on_exit(buf, 2, nil, state.get().run_id, current.id)
+
+  T.eq(1, #calls, "quickfix invocado una vez")
+  T.eq(2, calls[1].code, "con el código real")
+  T.eq("failed", state.get().status)
+
+  quickfix.handle = orig
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
 pcall(clean_windows)

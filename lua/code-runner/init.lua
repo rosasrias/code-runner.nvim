@@ -43,12 +43,29 @@ local function execute_action(action, vars, cwd, key, label)
 		if not ok then
 			terminal.notify(err, vim.log.levels.ERROR)
 		end
-		return
+		return nil
 	end
 
 	local cmd = shell.substitute(action, vars, key)
-	terminal.open(cmd, nil, cwd, label)
-	require("code-runner.history").add(cmd, cwd, key)
+	local exec_id = terminal.open(cmd, nil, cwd, label)
+	-- Identidad (EXEC-009 slice 2): el open devuelve el exec_id que trackeó.
+	-- Se usa el id devuelto (no el global) para no leer tracking obsoleto
+	-- cuando open está stubbeado o el comando no normalizó.
+	local exec = terminal.get_execution()
+
+	if exec == nil or exec.id ~= exec_id then
+		exec = nil
+	end
+
+	local idopts = nil
+
+	if exec ~= nil and exec.task_id ~= nil then
+		idopts = { task_id = exec.task_id, execution_id = exec.id, status = exec.status, vars = vars }
+	end
+
+	require("code-runner.history").add(cmd, cwd, key, idopts)
+
+	return exec
 end
 
 -- Variables de contexto disponibles para cualquier acción (y task): derivadas
@@ -169,11 +186,41 @@ function M.build_run()
 		}
 
 		remember_choice(last_choice)
-		execute_action(entry[choice], vars, cwd, key, choice)
+		local exec = execute_action(entry[choice], vars, cwd, key, choice)
+
+		-- Identidad (slice 2): si el job corre como Execution, last lleva su
+		-- task_id. `run_last` sigue re-ejecutando el comando (comportamiento
+		-- intacto); la resolución por task_id es slice 3.
+		if exec ~= nil and exec.task_id ~= nil then
+			last_choice.task_id = exec.task_id
+			remember_choice(last_choice)
+		end
 	end)
 end
 
+-- Resuelve una identidad persistida a su definición vigente.
+-- `vars_or_nil`/`test_or_nil` aportan el $testName para reconstruir la acción
+-- contextual de test. Devuelve def o nil (fallback legacy explícito).
+local function resolve_stored(task_id, lang, vars_or_nil, test_or_nil)
+	local test_name = (vars_or_nil or {})["$testName"] or test_or_nil
+	local ok, mod = pcall(require, "code-runner.task_resolve")
+
+	if not ok then
+		return nil
+	end
+
+	local def = mod.resolve(task_id, { lang = lang, test_name = test_name })
+
+	return def
+end
+
 -- Repite la última acción ejecutada sin abrir el selector
+--
+-- Slice 3: si hay task_id, se resuelve la definición VIGENTE y se
+-- re-sustituye su plantilla con los parámetros persistidos (`vars`): la
+-- plantilla puede haber evolucionado desde el lanzamiento guardado. Si la
+-- tarea ya no se resuelve (motivo explícito en `task_resolve`), fallback
+-- legacy: replay del comando guardado. Nunca falla duro.
 function M.run_last()
 	autosave()
 
@@ -184,15 +231,34 @@ function M.run_last()
 		return
 	end
 
+	if last_choice.task_id ~= nil then
+		local def = resolve_stored(last_choice.task_id, last_choice.lang, last_choice.vars, last_choice.test)
+
+		if def ~= nil then
+			execute_action(
+				def.template,
+				last_choice.vars or { ["$testName"] = last_choice.test },
+				last_choice.cwd,
+				last_choice.lang,
+				def.label
+			)
+			return
+		end
+	end
 	-- Repetición fiel de un "Run test": el comando quedó guardado con su contexto
 	if last_choice.cmd then
-		execute_action(
+		local exec = execute_action(
 			last_choice.cmd,
 			last_choice.vars or { ["$testName"] = last_choice.test },
 			last_choice.cwd,
 			last_choice.lang,
 			last_choice.choice
 		)
+
+		if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
+			last_choice.task_id = exec.task_id
+			remember_choice(last_choice)
+		end
 		return
 	end
 
@@ -204,7 +270,12 @@ function M.run_last()
 		return
 	end
 
-	execute_action(action, last_choice.vars, last_choice.cwd, last_choice.lang, last_choice.choice)
+	local exec = execute_action(action, last_choice.vars, last_choice.cwd, last_choice.lang, last_choice.choice)
+
+	if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
+		last_choice.task_id = exec.task_id
+		remember_choice(last_choice)
+	end
 end
 
 -- Selector del historial: re-ejecuta una entrada guardada
@@ -238,10 +309,35 @@ function M.run_history()
 			test = nil,
 			cmd = choice.cmd,
 			cwd = choice.cwd,
+			vars = choice.vars,
+			-- La entrada ya puede traer identidad (slice 2 / EXEC-008).
+			task_id = choice.task_id,
 		}
 
 		remember_choice(last_choice)
-		execute_action(choice.cmd, nil, choice.cwd, choice.key)
+
+		-- Slice 3: con identidad + parámetros persistidos se resuelve la
+		-- plantilla vigente. Sin task_id, sin vars o sin resolución,
+		-- fallback legacy explícito: replay del comando guardado (siempre
+		-- persistido como compat). El status registrado nunca decide: el
+		-- historial no es autoridad sobre el estado vivo (invariante 3).
+		if choice.task_id ~= nil and choice.vars ~= nil then
+			local def = resolve_stored(choice.task_id, choice.key, choice.vars, nil)
+
+			if def ~= nil then
+				execute_action(def.template, choice.vars, choice.cwd, choice.key, def.label)
+				return
+			end
+		end
+
+		local exec = execute_action(choice.cmd, nil, choice.cwd, choice.key)
+
+		-- Si el historial no traía identidad, toma la del tracking nuevo.
+		-- Nunca degrada una existente (label nil deriva solo la key).
+		if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
+			last_choice.task_id = exec.task_id
+			remember_choice(last_choice)
+		end
 	end)
 end
 

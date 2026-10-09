@@ -183,4 +183,9 @@ T.it("el módulo no depende de vim.fn.jobstart ni vim.system", function()
   local handle, _ = process.spawn { cmd = { "echo", "test" } }
   T.truthy(handle, "port funcional sin neovim")
   T.truthy(process.valid(), "adapter seteado")
+
+  -- Higiene: no dejar el mock instalado para los specs que lanzan jobs
+  -- reales (pty/terminal/e2e usan el puerto tras este archivo).
+  process.set_adapter(nil)
+  T.falsy(process.valid(), "puerto limpio")
 end)

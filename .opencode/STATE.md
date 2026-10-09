@@ -25,14 +25,13 @@ ______________________________________________________________________
 # Current Task
 
 ```text
-EXEC-006 — Result Handling
+EXEC-009 — Terminal Adapter (slice 2)
 ```
 
-Estado: **COMPLETADO** (ver `TODO.md`). Se creó `lua/code-runner/result_handler.lua`
-(Core puro): on_exit (code/signal) → Result canónico adjuntado vía `engine.finish`,
-con identity guard (`expected`), capture opcional del stream y rechazo de estados
-terminales/created. Tests: 11 nuevos. Suite: 507 pass · 0 fail · 1 skip. Sin
-conflicto nuevo; next: EXEC-007.
+Estado: **EN CURSO** (slices 1–5 completados 2026-10-09: tracking con guards
+probados + identidad en historial/last + task_id operativo + fuente única de
+eventos/Result + spawn por puerto PTY. Suite: 586 pass · 0 fail · 2 skip.
+Resta de EXEC-009: workflow sobre el Engine).
 
 ______________________________________________________________________
 
@@ -235,6 +234,25 @@ Persistent OpenCode documentation is being established.
 - `_on_exit` real (terminal.lua) sigue escribiendo estado/quickfix; wiring a
   job real en EXEC-009.
 - Sin conflictos nuevos.
+
+## EXEC-007 completado (2026-10-09)
+
+- `lifecycle_events.lua` formalizado como contrato puro EXEC-007: paridad
+  `CodeRunnerStart/Success/Failed/Cancelled + Exit`, `created/starting`
+  silenciosos, payload desde Execution con `cwd` canónico (`command.cwd`
+  > `ctx`/project root).
+- `engine.set_listener` valida `function|nil`; `emit` con `pcall` (listener
+  que lanza no rompe transición).
+- Tests: 3 nuevos (cwd canónico, rechazo no-function, throw aislado).
+  Suite: 527 pass · 0 fail · 2 skip.
+- Sin wiring real (adapter vim en EXEC-009). Sin conflictos nuevos.
+
+## EXEC-008 completado (2026-10-09)
+
+- `history.from_execution` canónico `version=1` + `add_execution` con dedup
+  por task_id y upgrade de legacy mismo cmd+cwd. UI legacy intacta.
+- Tests: 7 nuevos. Suite: 534 pass · 0 fail · 2 skip.
+- Flujo real intacto — wiring a EXEC-009. Sin conflictos nuevos.
 
 ---
 

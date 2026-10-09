@@ -18,14 +18,17 @@ local listener = nil
 
 -- El listener recibe cada Execution tras una transición válida:
 --   listener(exec)  -- exec es la snapshots ya transicionada
--- Pasa nil para desactivar.
+-- Pasa nil para desactivar. Solo acepta function o nil (programmer error
+-- si no); un listener que lanza no rompe la transición (se aísla con pcall,
+-- EXEC-007: el engine sigue siendo el dueño estable del lifecycle).
 function M.set_listener(fn)
+  assert(fn == nil or type(fn) == "function", "engine.set_listener: se espera function o nil")
   listener = fn
 end
 
 local function emit(exec)
   if listener and exec then
-    listener(exec)
+    pcall(listener, exec)
   end
 end
 

@@ -131,6 +131,24 @@ T.it("set_listener(nil) desactiva la emisión", function()
   T.eq(count, 1, "solo la transición previa al desactivado")
 end)
 
+T.it("set_listener rechaza no-function (programmer error)", function()
+  local ok = pcall(engine.set_listener, true)
+  engine.set_listener(nil)
+  T.falsy(ok, "true no es listener válido")
+end)
+
+T.it("un listener que lanza no rompe la transición", function()
+  engine.set_listener(function()
+    error "boom"
+  end)
+
+  local e = engine.create(fresh_spec())
+  e = engine.start(e)
+  engine.set_listener(nil)
+
+  T.eq(e.status, "starting")
+end)
+
 T.it("transiciones inválidas no emiten listener", function()
   local count = 0
   engine.set_listener(function()

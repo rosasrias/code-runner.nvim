@@ -756,17 +756,187 @@ ______________________________________________________________________
 
 Emit lifecycle events.
 
+### Status
+
+```text
+DONE
+```
+
+### Resultado (2026-10-09)
+
+- `lua/code-runner/lifecycle_events.lua` (Core puro, ya existente) formalizado
+  como contrato: `event_for/names/exits` con paridad `CodeRunnerStart/
+  Success/Failed/Cancelled + Exit`, `created/starting` silenciosos como
+  `events.lua` legacy. `data()` deriva payload de `Execution`
+  (`status/action/task_id/command/cwd/filetype/code`); `cwd` ahora prefiere
+  `command.cwd` canónico (CONTRACTS §8) con fallback a `ctx`/project root.
+  `for_transition/event_names`-a descriptores en orden, sin side effects.
+- `lua/code-runner/engine.lua`: `set_listener` valida `function|nil` (assert,
+  programmer error) y `emit` aísla con `pcall` — un listener que lanza no
+  rompe la transición (robustez EXEC-007).
+- Tests: `lifecycle_events_spec.lua` (13 tests) + 2 nuevos en
+  `engine_spec.lua` (rechazo no-function, listener throw no rompe).
+  Suite: 527 pass · 0 fail · 2 skip.
+- NO wiring al job real: el adapter vim (`nvim_exec_autocmds` sobre
+  `events.lua`) queda para EXEC-009. Sin conflictos nuevos; Core limpio
+  (BOUNDARIES §7).
+
 ______________________________________________________________________
 
 ## EXEC-008 — History Integration
 
 Store Execution-derived history.
 
+### Status
+
+```text
+DONE
+```
+
+### Resultado (2026-10-09)
+
+- `history.from_execution(exec, now)` puro: entrada canónica `version=1`
+  (`task_id/execution_id/status/cmd/command/cwd/key/context/result/ts`);
+  `cmd`/`cwd`/`key` por compat con UI legacy (`run_history` sigue leyendo
+  `.cmd`), clonado sin compartir refs, validación con `(nil, err)`.
+- `history.add_execution(exec)`: dedup por `(task_id + cmd + cwd)` con `count`,
+  upgrade de legacy mismo `cmd+cwd` sin duplicar, `trim` por `max`,
+  respeta `history.enabled`, no escribe en inválido.
+- Flujo real intacto (`init.lua` sigue en `add` legacy): migración del
+  consumidor a EXEC-009. Tests: 7 nuevos en `history_spec.lua`.
+  Suite: 534 pass · 0 fail · 2 skip. Sin conflictos nuevos.
+
 ______________________________________________________________________
 
 ## EXEC-009 — Terminal Adapter
 
 Make terminal UI consume Execution output instead of owning execution lifecycle.
+
+### Status
+
+```text
+IN PROGRESS (slice 1 DONE, 2026-10-09)
+```
+
+### Resultado slice 1 — tracking Engine sobre el job real
+
+- Nuevo `lua/code-runner/terminal/tracking.lua` (dueño de `current_exec`):
+  `start(cmd, key, label)` crea la Execution con `task.id(key, label)`
+  (ADR-002) y la lleva a running; `finish(code, expected)` con identity guard
+  (on_exit tardío ignorado); `cancel()`/`fail_launch()`; `get()/events()` para
+  introspección. Todo best-effort: si el comando no normaliza se sigue legacy.
+- `terminal.open/_on_exit/_close_current` delegan sin cambiar el path legacy
+  (state/quickfix/buffer intactos). Además dos fixes de robustez de la
+  auditoría: `.. command` (tabla) → `tostring(cmd)` y guards
+  `nvim_buf_is_valid` en cleanup.
+- Sin doble emisión (descriptores expuestos, despacho sigue legacy) y sin
+  doble historial (registro al lanzar sigue legacy; migración a
+  `add_execution` = slice 2 en init).
+- Excepción documentada: el spawn sigue siendo `termopen`; el puerto
+  `process` con PTY queda para un slice posterior.
+- Tests: 3 nuevos en `terminal_spec.lua`. Suite: 537 pass · 0 fail · 2 skip.
+- Slices restantes: init → `add_execution` + task_id en `run_last` (criterios
+  2 parcial/3), despacho de eventos Engine (criterio 2), spawn por puerto
+  (criterio 1), workflow sobre Engine (criterio 5).
+
+### Endurecimiento slice 1b — vigilancia de identidad/guards (2026-10-09)
+
+Respuesta a 4 puntos de vigilancia antes de avanzar:
+
+1. **Identidad**: `start()` crea Execution nueva (id fresco) por lanzamiento;
+   `task_id` estable por key+label. El reemplazo cancela la anterior: ninguna
+   queda running huérfana. `open()` también cancela el tracking al reemplazar
+   un job en marcha.
+2. **Guard barrera**: `finish(code, expected)` ignora stale sin tocar
+   `current` (A tardía no toca B; B válida sí finaliza; doble finish no-op).
+3. **Fallback explícito**: `skip_reason()` expone `{reason, detail, cmd}`
+   cuando el comando no normaliza (`&&`); `get()==nil`, nada a medio
+   inicializar; un start válido lo limpia.
+4. **Cancelación**: `cancel → on_exit` ignorado (ya terminal); `fail_launch`
+   solo con expected vigente. Reconocido: `cancel` del tracking no mata el
+   proceso real (lo hace el buffer delete); el puerto con terminate es slice
+   posterior.
+- Nuevo `tests/tracking_spec.lua` (13 tests unitarios, sin terminales).
+  Suite: 550 pass · 0 fail · 2 skip.
+
+### Slice 2 — identidad en historial y last (2026-10-09)
+
+- `terminal.open` devuelve el `exec_id` trackeado (nil si no normalizó);
+  `execute_action` usa el id devuelto (nunca el global) para no leer tracking
+  obsoleto con open stubbeado.
+- `history.add(cmd, cwd, key, opts?)` con `{task_id, execution_id, status}`
+  opcional; relanzamiento legacy hereda task_id/status sin degradar (pero
+  nunca hereda execution_id viejo).
+- `build_run/run_history/run_last` propagan `task_id` a `last_choice`
+  (persistido); `run_last` sigue re-ejecutando el comando — la resolución por
+  task_id es slice 3. `run_history` nunca degrada identidad existente.
+- Tests: 3 en `history_spec.lua` + 2 en `init_spec.lua`.
+  Suite: 555 pass · 0 fail · 2 skip. Sin cambios de comportamiento.
+
+### Slice 3 — task_id operativo en run_last/run_history (2026-10-09)
+
+Contrato (salvedad del brief): la identidad persistida alcanza para
+reconstruir la intención porque `last` persiste `vars` (`$testName`, ...)
+e historial persiste `vars` desde este slice (`history.add` opts `vars`,
+clonadas). Sin vars, solo replay del comando guardado (siempre persistido).
+
+- Nuevo `lua/code-runner/task_resolve.lua` (Application, extraído por
+  responsabilidad con contrato claro — no por líneas): `resolve(task_id,
+  {lang, test_name})` → def `{label, template, key}` o `(nil, reason)` con
+  `no-catalog-entry|task-desconocida|command-funcion|test-no-aplica`.
+  Catálogo por comparación de `task.id` (icon-proof); test contextual
+  reconstruido desde `$testName` y VERIFICADO (sin resolución silenciosa).
+- `run_last`: con task_id resuelve plantilla vigente + re-sustituye con vars
+  persistidas; si no resuelve, fallback legacy explícito (replay). Nunca duro.
+- `run_history`: con task_id + vars resuelve; sin task_id, sin vars o sin
+  resolución, replay del comando guardado. El `status` registrado nunca
+  decide (invariante 3). Cada relanzamiento crea Execution nueva: el
+  `execution_id` del historial siempre apunta a la última (invariante 1).
+- Tests: 9 en `task_resolve_spec.lua` + 2 vars en `history_spec.lua` + 5 en
+  `init_spec.lua` (plantilla vigente vs replay, tarea eliminada, failed
+  re-ejecuta, task desconocida, ids frescos).
+  Suite: 571 pass · 0 fail · 2 skip.
+
+### Slice 4 — fuente única de eventos y Result (2026-10-09)
+
+- `state.set(status, info, opts)` con `opts.emit = false`: espeja sin
+  autocmds (default emite: path legacy y tests intactos).
+- `tracking.dispatch()`: dispara los descriptores como autocmds `User`,
+  respeta `events.enabled`, cada listener aislado con pcall (un autocmd de
+  usuario que lanza no rompe el exit). Devuelve conteo.
+- `terminal._on_exit`: con `exec_id` vigente el Engine finaliza (única
+  fuente de Result), el estado espeja en silencio y los eventos salen del
+  dispatch — una emisión por transición; quickfix sigue consumiendo el exit.
+  Sin tracking, path legacy intacto. Stale no toca nada (ninguna vía).
+- `_close_current` y reemplazo en `open` vía `mirror_cancel()`: Engine
+  cancela + espejo silencioso + dispatch, o legacy si no había tracking.
+  `fail_launch` también expone descriptores y sigue el mismo espejo.
+- Historial: sin cambios (registro al lanzar; slice 2). Ninguna duplicación.
+- Tests: 3 dispatch en `tracking_spec.lua` + 3 en `terminal_spec.lua`
+  (emisión única Success/Exit, Cancelled/Exit, quickfix cableado) + 1 en
+  `state_spec.lua` (emit=false).
+  Suite: 578 pass · 0 fail · 2 skip.
+- Resta de EXEC-009: spawn por puerto `process` con PTY, workflow sobre el
+  Engine, despacho legacy en `events.emit` aún sin pcall (preexistente).
+
+### Slice 5 — spawn por el puerto con PTY (2026-10-09)
+
+- Nuevo `lua/code-runner/terminal/pty.lua`: adapter `spawn/send/terminate`
+  sobre `termopen` (CONTRACTS §19). Límites explícitos: sin `on_stdout` (el
+  PTY vuelca al buffer), `signal = nil` (termopen no entrega), `opts.buf`
+  obligatorio. Normaliza el fallo (`0` y `-1` → nil+err; el legacy solo
+  miraba `-1`).
+- `terminal.open` lanza por `process.spawn` (mismo `wrap_command` como
+  `cmd[]`); `pty.launch` concentra el CÓMO e instala el PTY perezosamente
+  (un mock inyectado se respeta). Sin camino paralelo de lifecycle.
+- `process_spec` limpia su mock al final (higiene: los specs con jobs reales
+  usan el puerto después).
+- Tests: 8 en `tests/pty_spec.lua` (instalación, mock respetado, lazy
+  install, exit-code real 42, buf inválido, terminate con on_exit, send,
+  dos jobs sin cruzar callbacks).
+  Suite: 586 pass · 0 fail · 2 skip.
+- Resta de EXEC-009: workflow sobre el Engine, `events.emit` legacy sin
+  pcall (preexistente).
 
 ______________________________________________________________________
 

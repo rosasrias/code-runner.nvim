@@ -58,14 +58,19 @@ end
 -- Payload canónico derivado de una Execution (paridad de campos con la API
 -- pública: status/action/cwd/filetype/buf/code). `buf` no tiene equivalente de
 -- Execution (la terminal la decide, EXEC-009); se omite aquí.
+-- cwd: el CommandSpec es la fuente canónica (CONTRACTS §8); ctx.cwd se
+-- conserva como fallback legacy (tests/context con cwd plano) y por último
+-- la raíz del proyecto detectado.
 function M.data(exec)
   local ctx = exec.context or {}
+  local cmd = exec.command or {}
+  local cwd = cmd.cwd or ctx.cwd or (ctx.project and ctx.project.root)
   return {
     status = exec.status,
     action = exec.task_id,
     task_id = exec.task_id,
     command = exec.command and exec.command.executable or nil,
-    cwd = ctx.cwd,
+    cwd = cwd,
     filetype = ctx.filetype,
     code = exec.result and exec.result.code,
   }

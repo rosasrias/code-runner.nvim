@@ -82,6 +82,16 @@ T.it("running (antes del result) omite code", function()
   T.eq(lifecycle.data(exec).code, nil)
 end)
 
+T.it("cwd prefiere command.cwd (canónico) sobre ctx legacy", function()
+  local e = engine.create {
+    task_id = "run",
+    context = { filetype = "go", cwd = "/tmp/legacy" },
+    command = { executable = "go", args = { "run", "." }, cwd = "/tmp/proj" },
+    now = 1000,
+  }
+  T.eq(lifecycle.data(e).cwd, "/tmp/proj")
+end)
+
 T.section("lifecycle_events: integration con el engine (EXEC-007)")
 
 T.it("acceptance: el listener del engine y el mapeo producin la secuencia publica", function()

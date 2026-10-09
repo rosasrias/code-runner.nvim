@@ -6,9 +6,26 @@ local config = require "code-runner.config"
 local shell = require "code-runner.shell"
 local buffer = require "code-runner.terminal.buffer"
 local ui = require "code-runner.terminal.ui"
+local tracking = require "code-runner.terminal.tracking"
+local pty = require "code-runner.terminal.pty"
 
 local M = {}
 M.BUF_NAME = buffer.BUF_NAME
+
+-- Execution en seguimiento (dueño: `terminal/tracking.lua`): la terminal
+-- consume el Engine y lanza por el puerto `process` (adapter PTY). El path
+-- legacy (state/quickfix/buffer) sigue como compat cuando no hay tracking.
+--
+-- Execution actualmente en seguimiento (copia) o nil.
+function M.get_execution()
+  return tracking.get()
+end
+
+-- Descriptores del último on_exit (introspección/tests). Con tracking, los
+-- autocmds salen de `tracking.dispatch()`; sin tracking, vía legacy.
+function M.last_events()
+  return tracking.events()
+end
 
 -- Re-export de la UI y de los helpers de buffer para conservar la API pública
 -- y lo que usan los tests (terminal._open_window, _label_parts, ...).
@@ -47,12 +64,29 @@ function M.notify(msg, level, title)
   vim.api.nvim_echo({ { msg, hl } }, true, {})
 end
 
+-- Espeja una cancelación del Engine en el estado legacy sin duplicar eventos:
+-- si el tracking canceló (fuente Engine), el estado espeja en silencio y los
+-- autocmds salen de `tracking.dispatch()`; si no había tracking, legacy emite.
+local function mirror_cancel()
+  local done = tracking.cancel()
+
+  if done then
+    require("code-runner.state").set("cancelled", {}, { emit = false })
+    tracking.dispatch()
+    return true
+  end
+
+  return false
+end
+
 -- Cierra la ventana que muestra `buf` y libera el buffer del plugin.
 -- Si el job seguía corriendo, el cierre por el usuario se registra como
 -- cancelado (la terminal se borra y con ella muere el job).
 function M._close_current(buf)
   if require("code-runner.state").get().status == "running" then
-    require("code-runner.state").set "cancelled"
+    if not mirror_cancel() then
+      require("code-runner.state").set "cancelled"
+    end
   end
 
   for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -162,27 +196,36 @@ function M._exit_hint(buf, code, qf_count)
 end
 
 -- Estado al salir del proceso: quickfix + closure según la configuración.
--- Solo registra success/failed si el job sigue siendo el actual (run_id):
--- un on_exit asíncrono de un job reemplazado, o un cierre por el usuario
--- (cancelado), no pueden pisar el estado del job que corre ahora.
-function M._on_exit(buf, code, cwd, run_id)
+-- Slice 4: el Engine es la única fuente de Result e identidad. Si el on_exit
+-- corresponde al job trackeado (`exec_id`), el Engine finaliza, el estado
+-- legacy ESPEJA en silencio y los autocmds salen de `tracking.dispatch()`:
+-- una sola emisión por transición. Sin `exec_id` o con tracking ausente
+-- (llamadas legacy/tests, chain `&&`), path legacy intacto (state emite).
+-- `exec_id` obsoleto no toca nada (barrera del slice 1b).
+function M._on_exit(buf, code, cwd, run_id, exec_id)
   local state = require "code-runner.state"
   local s = state.get()
+  local done = tracking.finish(code, exec_id)
 
-  if s.status == "running" and (run_id or s.run_id) == s.run_id then
+  if done then
+    if s.status == "running" and (run_id or s.run_id) == s.run_id then
+      state.set(done.status, { code = done.result.code, cwd = cwd }, { emit = false })
+    end
+    tracking.dispatch()
+  elseif s.status == "running" and (run_id or s.run_id) == s.run_id then
     state.set(code == 0 and "success" or "failed", { code = code, cwd = cwd })
   end
 
   -- Limpia temporales del job (p.ej. el directorio de clases que `javac -d`
   -- crea para el smart run de Java) en cuanto termina, sea éxito o error.
-  local paths = vim.b[buf] and vim.b[buf].code_runner_cleanup
+  local paths = vim.api.nvim_buf_is_valid(buf) and vim.b[buf] and vim.b[buf].code_runner_cleanup or nil
 
   if paths then
     for _, p in ipairs(paths) do
       pcall(vim.fn.delete, p, "rf")
     end
 
-    if vim.b[buf] then
+    if vim.api.nvim_buf_is_valid(buf) and vim.b[buf] then
       vim.b[buf].code_runner_cleanup = nil
     end
   end
@@ -204,6 +247,8 @@ end
 -- cwd (opcional): directorio en el que arranca el job (raíz del proyecto).
 -- label (opcional): acción elegida (Run/Build) para el título de la ventana.
 -- cleanup (opcional): lista de rutas a borrar al terminar el job.
+-- Devuelve el exec_id del tracking (o nil si el comando no se modeló como
+-- Execution): el llamador lo usa para identidad sin leer estado global.
 function M.open(cmd, direction, cwd, label, cleanup)
   direction = direction or config.options.terminal.direction
 
@@ -232,7 +277,9 @@ function M.open(cmd, direction, cwd, label, cleanup)
     if state.get().status == "running" then
       -- El job del plugin sigue en marcha: cancelarlo y reabrir desde cero
       -- (evitar reutilizar un buffer jobado igual equivale a stop implícito).
-      state.set "cancelled"
+      if not mirror_cancel() then
+        state.set "cancelled"
+      end
       pcall(vim.api.nvim_buf_delete, candidate, { force = true })
     else
       -- Job terminado: reusamos el buffer (termopen reinicia ahí el nuevo
@@ -264,12 +311,6 @@ function M.open(cmd, direction, cwd, label, cleanup)
   vim.b[buf].code_runner_cleanup = cleanup or nil
   ui._apply_window_label(buf, ui._label_parts(label))
 
-  local opts = {}
-
-  if cwd and cwd ~= "" then
-    opts.cwd = cwd
-  end
-
   -- Estado central antes de lanzar: registra el job nuevo y su run_id. Los
   -- on_exit de jobs anteriores (run_id viejo) no podrán pisar este estado.
   state.set("running", {
@@ -280,21 +321,40 @@ function M.open(cmd, direction, cwd, label, cleanup)
   })
   local rid = state.get().run_id
 
-  opts.on_exit = function(_, code)
-    M._on_exit(buf, code, cwd, rid)
-  end
+  -- Tracking Engine (best-effort, dueño: `terminal/tracking.lua`).
+  local exec_id = tracking.start(cmd, entry_key, label or "")
 
   -- termopen exige un buffer sin modificar: al reusar el buffer de la
   -- terminal, el job anterior dejó `modified` en al revisar.
   pcall(vim.api.nvim_buf_set_option, buf, "modified", false)
 
-  if vim.fn.termopen(command, opts) == -1 then
-    state.set("failed", { code = -1 })
-    M.notify("No se pudo lanzar el comando: " .. command, vim.log.levels.ERROR)
-    return
+  -- Slice 5: el lanzamiento productivo sale por el puerto (adapter PTY).
+  -- `terminal.open` decide QUÉ (comando, buffer, cwd, callbacks); el CÓMO
+  -- vive en `pty.launch`. Sin camino paralelo de lifecycle.
+  local _, serr = pty.launch(command, {
+    cwd = (cwd ~= nil and cwd ~= "") and cwd or nil,
+    buf = buf,
+    on_exit = function(code)
+      M._on_exit(buf, code, cwd, rid, exec_id)
+    end,
+  })
+
+  if serr ~= nil then
+    local launched = tracking.fail_launch(exec_id)
+
+    if launched then
+      state.set("failed", { code = -1 }, { emit = false })
+      tracking.dispatch()
+    else
+      state.set("failed", { code = -1 })
+    end
+
+    M.notify("No se pudo lanzar el comando: " .. tostring(cmd), vim.log.levels.ERROR)
+    return nil
   end
 
   vim.cmd "startinsert"
+  return exec_id
 end
 
 return M

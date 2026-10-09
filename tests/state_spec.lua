@@ -65,6 +65,24 @@ T.it("un status inválido es un no-op", function()
   T.eq("idle", state.get().status)
 end)
 
+T.it("set con emit=false espeja sin autocmds (EXEC-009 slice 4)", function()
+  local events = require "code-runner.events"
+  local orig_emit = events.emit
+  local calls = {}
+  events.emit = function(status, s)
+    table.insert(calls, status)
+  end
+
+  state.set("running", { action = "Run" }, { emit = false })
+  state.set("success", { code = 0 }, { emit = false })
+
+  events.emit = orig_emit
+  T.eq(0, #calls, "silencio total")
+  T.eq("success", state.get().status, "el estado sí se espeja")
+  T.eq(0, state.get().code)
+  state.set("idle")
+end)
+
 T.it("get devuelve una copia: mutarla no ensucia el interno", function()
   state.set("running", { action = "Build" })
   local s = state.get()

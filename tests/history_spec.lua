@@ -96,6 +96,151 @@ T.it("clear vacía el historial", function()
   T.eq(0, #history.list())
 end)
 
+T.section("historial: identidad de Execution (EXEC-009 slice 2)")
+
+T.it("add con opts guarda task_id/execution_id/status", function()
+  fresh()
+  history.add("go test ./...", "C:/proj", "go", { task_id = "go.test", execution_id = 7, status = "running" })
+
+  local items = history.list()
+  T.eq("go.test", items[1].task_id)
+  T.eq(7, items[1].execution_id)
+  T.eq("running", items[1].status)
+  T.eq("go test ./...", items[1].cmd, "compat legacy intacta")
+end)
+
+T.it("add legacy no trae identidad", function()
+  fresh()
+  history.add("go test ./...", "C:/proj", "go")
+
+  T.eq(nil, history.list()[1].task_id)
+end)
+
+T.it("relanzamiento legacy no degrada la identidad existente", function()
+  fresh()
+  history.add("go test ./...", "C:/proj", "go", { task_id = "go.test", execution_id = 7, status = "success" })
+  history.add("go test ./...", "C:/proj", "go")
+
+  local items = history.list()
+  T.eq(1, #items)
+  T.eq(2, items[1].count)
+  T.eq("go.test", items[1].task_id, "task_id heredado")
+  T.eq(nil, items[1].execution_id, "execution_id viejo no se hereda")
+end)
+
+T.it("add con vars persiste los parámetros de invocación", function()
+  fresh()
+  history.add("go test -run TestFoo", "C:/p", "go", {
+    task_id = "go.test",
+    vars = { ["$testName"] = "TestFoo" },
+  })
+
+  local items = history.list()
+  T.eq("TestFoo", items[1].vars["$testName"])
+end)
+
+T.it("vars no se comparten con el llamador", function()
+  fresh()
+  local vars = { ["$testName"] = "TestFoo" }
+  history.add("go test", "C:/p", "go", { vars = vars })
+  vars["$testName"] = "MUTADO"
+
+  T.eq("TestFoo", history.list()[1].vars["$testName"])
+end)
+
+T.section("historial derivado de Execution (EXEC-008)")
+
+local function fresh_exec(over)
+  local base = {
+    id = 42,
+    task_id = "go.test",
+    status = "success",
+    context = { filetype = "go" },
+    command = { executable = "go", args = { "test", "./..." }, cwd = "C:/proj" },
+    result = { code = 0 },
+  }
+
+  if over then
+    for k, v in pairs(over) do
+      base[k] = v
+    end
+  end
+
+  return base
+end
+
+T.it("from_execution construye entrada canónica version=1", function()
+  local entry = history.from_execution(fresh_exec())
+
+  T.eq(1, entry.version)
+  T.eq("go.test", entry.task_id)
+  T.eq(42, entry.execution_id)
+  T.eq("go test ./...", entry.cmd)
+  T.eq("C:/proj", entry.cwd)
+  T.eq("go", entry.key)
+  T.eq(0, entry.result.code)
+  T.truthy(entry.ts)
+end)
+
+T.it("from_execution no comparte referencias con la Execution", function()
+  local exec = fresh_exec()
+  local entry = history.from_execution(exec)
+
+  entry.command.args[1] = "MUTADO"
+  T.eq("test", exec.command.args[1])
+end)
+
+T.it("from_execution rechaza Execution inválida", function()
+  T.falsy(history.from_execution(nil))
+  T.falsy(history.from_execution { task_id = "x" })
+  T.falsy(history.from_execution { task_id = "x", command = { executable = "" } })
+end)
+
+T.it("add_execution persiste y dedup por task_id suma count", function()
+  fresh()
+  config.options.history.enabled = true
+
+  local e1 = history.add_execution(fresh_exec())
+  local e2 = history.add_execution(fresh_exec { id = 43 })
+
+  T.truthy(e1)
+  T.truthy(e2)
+
+  local items = history.list()
+  T.eq(1, #items, "misma task no duplica")
+  T.eq(2, items[1].count)
+  T.eq("go.test", items[1].task_id)
+  T.eq("go test ./...", items[1].cmd, "UI legacy sigue leyendo .cmd")
+end)
+
+T.it("add_execution con distinto cwd son entradas distintas", function()
+  fresh()
+  history.add_execution(fresh_exec { id = 1 })
+  history.add_execution(fresh_exec { id = 2, command = { executable = "go", args = { "test" }, cwd = "C:/otro" } })
+
+  T.eq(2, #history.list())
+end)
+
+T.it("add_execution rechaza inválido sin escribir", function()
+  fresh()
+  local entry, err = history.add_execution(nil)
+
+  T.falsy(entry)
+  T.truthy(err)
+  T.eq(0, #history.list())
+end)
+
+T.it("legacy se fusiona al llegar su Execution (upgrade sin duplicar)", function()
+  fresh()
+  history.add("go test ./...", "C:/proj", "go")
+  history.add_execution(fresh_exec())
+
+  local items = history.list()
+  T.eq(1, #items, "mismo cmd+cwd no duplica: upgrade a canónica")
+  T.eq("go.test", items[1].task_id)
+  T.eq(2, items[1].count)
+end)
+
 T.section("historial: persistencia")
 
 T.it("cada archivo guarda su estado (se lee desde disco)", function()

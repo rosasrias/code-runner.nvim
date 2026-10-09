@@ -29,12 +29,16 @@ local current = fresh()
 -- pisa el estado del job actual. Los estados finales conservan acción/cwd/
 -- filetype/run_id del job que terminó y guardan info.code. Devuelve false si
 -- el status no es válido (no-op).
-function M.set(status, info)
+-- `opts.emit = false` suprime los autocmds (slice 4: el Engine decide y el
+-- dispatch sale de `tracking.dispatch()`; el estado solo espeja).
+function M.set(status, info, opts)
   if not vim.tbl_contains(M.STATUSES, status) then
     return false
   end
 
   info = info or {}
+  opts = opts or {}
+  local emit = opts.emit ~= false
 
   if status == "running" then
     local next_run = (current.run_id or 0) + 1
@@ -45,7 +49,9 @@ function M.set(status, info)
     current.buf = info.buf
     current.started_at = os.time()
     current.run_id = next_run
-    events.emit(status, current)
+    if emit then
+      events.emit(status, current)
+    end
     return true
   end
 
@@ -56,7 +62,9 @@ function M.set(status, info)
     current.code = info.code
   end
 
-  events.emit(status, current)
+  if emit then
+    events.emit(status, current)
+  end
 
   return true
 end
