@@ -32,9 +32,11 @@ local function volt_pick(items, opts, on_choice, volt)
   local close
 
   ---------------------------------------------------------
-  -- Dimensiones
+  -- Dimensiones (el título también cuenta: si no, nvim lo trunca con "<")
   ---------------------------------------------------------
-  local content_w = api.nvim_strwidth(opts.prompt or "")
+  local title_text = " " .. (opts.title or "CodeRunner") .. " "
+  local content_w = api.nvim_strwidth(title_text)
+  content_w = math.max(content_w, api.nvim_strwidth(opts.prompt or ""))
 
   for _, item in ipairs(items) do
     content_w = math.max(content_w, api.nvim_strwidth(display(item, opts.format_item)))
@@ -196,8 +198,6 @@ local function volt_pick(items, opts, on_choice, volt)
   ---------------------------------------------------------
   volt.run(buf, { h = height, w = width })
 
-  local title = opts.title or "CodeRunner"
-
   api.nvim_open_win(buf, true, {
     relative = "editor",
     width = width,
@@ -205,7 +205,7 @@ local function volt_pick(items, opts, on_choice, volt)
     row = math.floor((vim.o.lines - height) / 2),
     col = math.floor((vim.o.columns - width) / 2),
     border = "rounded",
-    title = "  " .. title .. " ",
+    title = title_text,
     title_pos = "center",
     style = "minimal",
     zindex = 60,
