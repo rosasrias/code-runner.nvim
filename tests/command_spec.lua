@@ -119,6 +119,35 @@ T.it("round-trip con espacios dentro de comillas", function()
   T.eq(table.concat(spec2.args, "|"), table.concat(spec.args, "|"))
 end)
 
+T.section("command: normalize_spawn (slice 7, modela lo spawneado)")
+
+T.it("comando único se modela directo", function()
+  local command = require "code-runner.command"
+  local spec, err = command.normalize_spawn("go run .", { "go", "run", "." })
+
+  T.falsy(err)
+  T.eq("go", spec.executable)
+  T.eq({ "run", "." }, spec.args)
+end)
+
+T.it("chain && se modela con el argv envuelto (un proceso, una Execution)", function()
+  local command = require "code-runner.command"
+  local spec, err = command.normalize_spawn("a && b", { "bash", "-lc", "a && b" })
+
+  T.falsy(err)
+  T.eq("bash", spec.executable)
+  T.eq({ "-lc", "a && b" }, spec.args)
+end)
+
+T.it("sin && ni parse válido no hay fallback silencioso", function()
+  local command = require "code-runner.command"
+
+  T.falsy(command.normalize_spawn("", { "bash", "-lc", "" }))
+  T.falsy(command.normalize_spawn(nil, nil))
+  T.falsy(command.normalize_spawn("a && b", nil), "sin argv no hay modelo")
+  T.falsy(command.normalize_spawn("a && b", { "bash", 42 }), "argv inválido no vale")
+end)
+
 T.section("command: validate / valid / normalize")
 
 T.it("validate rechaza no-tabla", function()

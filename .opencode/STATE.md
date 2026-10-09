@@ -9,7 +9,7 @@ ______________________________________________________________________
 # Current Phase
 
 ```text
-P0 — Architecture Foundation
+P1 — Execution Core: DONE 2026-10-09 (siguiente: P2 — Runner Architecture)
 ```
 
 ______________________________________________________________________
@@ -25,13 +25,15 @@ ______________________________________________________________________
 # Current Task
 
 ```text
-EXEC-009 — Terminal Adapter (slice 2)
+P1 — Execution Core: DONE (siguiente: P2 Runner Architecture)
 ```
 
-Estado: **EN CURSO** (slices 1–5 completados 2026-10-09: tracking con guards
-probados + identidad en historial/last + task_id operativo + fuente única de
-eventos/Result + spawn por puerto PTY. Suite: 586 pass · 0 fail · 2 skip.
-Resta de EXEC-009: workflow sobre el Engine).
+Estado: **P1 DONE 2026-10-09**. Revisión administrativa final (ver TODO.md):
+árbol completo auditado (36 specs registrados, sin ficheros fuera de la
+auditoría), suite 607/0/2 sobre el árbol final, EXEC-009 DONE, 3
+bloqueantes cerrados en slices 7–9 con evidencia. Residuales aceptados y
+splits diferidos anotados sin abrir bloqueantes (init/terminal split,
+B1/B2/C9, events.emit sin pcall). Siguiente prioridad del roadmap: P2.
 
 ______________________________________________________________________
 

@@ -249,6 +249,43 @@ function M.normalize(input)
   }
 end
 
+-- Normaliza para MODELAR LO SPAWNEADO (EXEC-009 slice 7).
+--
+-- Un comando único se modela directo. Una cadena con `&&` NO es N
+-- ejecuciones (hay un solo proceso shell con un solo exit code: N
+-- Executions serían artificiales): se modela con el ARGV ya envuelto para
+-- el spawn (`shell.wrap_command`), cuyos args son opacos para la
+-- validación. `argv` debe ser `string[]` no vacío (`{ exe, ...args }`).
+-- Devuelve (spec, nil) o (nil, error). Sin `&&` ni parse válido, no hay
+-- fallback: el llamador sigue legacy de forma explícita y observable.
+function M.normalize_spawn(raw, argv)
+  local spec, err = M.normalize(raw)
+
+  if spec then
+    return spec, nil
+  end
+
+  if type(raw) ~= "string" or raw:find("&&", 1, true) == nil then
+    return nil, err
+  end
+
+  if type(argv) ~= "table" or type(argv[1]) ~= "string" or argv[1] == "" then
+    return nil, err
+  end
+
+  local args = {}
+
+  for i = 2, #argv do
+    if type(argv[i]) ~= "string" then
+      return nil, err
+    end
+
+    args[#args + 1] = argv[i]
+  end
+
+  return M.normalize { executable = argv[1], args = args }
+end
+
 M._internals = {
   split_tokens = split_tokens,
 }

@@ -1,14 +1,31 @@
--- Workflow: tasks con varios pasos secuenciales (P3). Es un engine mínimo,
--- deliberadamente sin scheduler: corre una lista de comandos en orden, cada
--- uno en "headless" (captura el exit code sin abrir terminal a la vista) y con
--- stop-si-falla opcional.
+-- Workflow: tasks con varios pasos secuenciales (P3). Orquesta una lista de
+-- comandos: cada paso corre "headless" (captura el exit code sin abrir
+-- terminal a la vista) y con stop-si-falla opcional.
+--
+-- Clasificación (slice 9): `execute/execute_parallel` = API pública
+-- soportada como núcleo síncrono y determinista de orquestación (pasos +
+-- reglas de avance sobre un `run_step` inyectado); `run/run_parallel` =
+-- vías productivas async sobre el mismo núcleo + Engine por paso. Todo paso,
+-- sync o async, transiciona su Execution; no hay ciclo de vida paralelo.
+--
+-- Slice 6: el ciclo de vida de cada paso lo posee el Engine
+-- (`engine` + `result_handler`); el headless (`headless.lua`, contrato
+-- `process` sobre jobstart) solo habla con el proceso. El workflow conserva
+-- SU responsabilidad de aplicación: decidir qué paso sigue según el
+-- resultado. La lógica de avance NUNCA entra al Engine.
 --
 -- Una task se registra con steps (lista de comandos a sustituir) y es distinta
 -- de una acción del picker (registry): no aparece en build_run, se invoca por
 -- nombre con require("code-runner").run_task("nombre") o :CodeRunTask.
 --
 -- Núcleo: `execute(spec, run_step)` es síncrono y testeable (run_step inyectado).
--- `run(name)` es la envoltura async real basada en jobstart.
+-- `run(name)` es la envoltura async real basada en el headless.
+local shell = require "code-runner.shell"
+local engine = require "code-runner.engine"
+local task = require "code-runner.task"
+local command = require "code-runner.command"
+local result_handler = require "code-runner.result_handler"
+local headless = require "code-runner.headless"
 local shell = require "code-runner.shell"
 
 local M = {}
@@ -56,12 +73,56 @@ local function run_single(spec, run_step, idx)
   return { cmd = cmd, code = code }
 end
 
+-- Crea la Execution de un paso (best-effort): identidad estable por posición
+-- (`task.id(spec.name, "step-N")`; la tarea es QUÉ, la Execution es ESTA
+-- invocación). Slice 7: modela LO SPAWNEADO (spec directo o argv envuelto
+-- para chains `&&`: un proceso, una Execution). Si no hay modelo, nil y el
+-- paso sigue legacy. Cada invocación de `run` crea las suyas: un exit tardío
+-- de otra cadena no puede tocarlas (los guards de `result_handler` lo
+-- garantizan).
+local function step_execution(spec, idx, cmd)
+  local argv = type(cmd) == "string" and shell.wrap_command(cmd) or nil
+  local spec_cmd, serr = command.normalize_spawn(cmd, argv)
+
+  if not spec_cmd then
+    return nil
+  end
+
+  local created = engine.create {
+    task_id = task.id(spec.name or "workflow", "step-" .. idx),
+    context = { filetype = spec.key },
+    command = spec_cmd,
+  }
+
+  if not created then
+    return nil
+  end
+
+  local started = engine.start(created)
+  local running = started and engine.running(started) or nil
+
+  return running
+end
+
+-- Finaliza la Execution de un paso síncrono con su exit code (best-effort:
+-- sin Execution no hay transición, pero el avance no se detiene).
+local function finish_step(exec, code)
+  if exec ~= nil then
+    result_handler.complete(exec, { code = code, expected = exec.id })
+  end
+end
+
 -- Núcleo síncrono: corre cada paso llamando a `run_step(cmd, cwd)` que devuelve
 -- el exit code (siempre síncrono; para tests o wrappers).
 -- Si spec.parallel está seteado, lanza todos los pasos en paralelo
 -- (simulado: el run_step inyectado se llama en orden, pero se comporta como
 -- si fueran concurrentes — para tests reales usa `run()` con jobstart).
 -- Con stop_on_fail se detiene en el primer error. Devuelve { ok, results }.
+--
+-- Contrato (slice 9): API pública soportada como núcleo determinista de
+-- orquestación. Cada paso transiciona su Execution en el Engine (observable
+-- vía listener); el runner inyectado solo aporta el exit code. Sin
+-- procesos, sin UI, sin segundo ciclo de vida.
 function M.execute(spec, run_step)
   if spec.parallel then
     return M.execute_parallel(spec, run_step)
@@ -71,7 +132,10 @@ function M.execute(spec, run_step)
   local ok = true
 
   for i, step in ipairs(spec.steps) do
+    local cmd = shell.substitute(step, nil, spec.key)
+    local exec = step_execution(spec, i, cmd)
     local r = run_single(spec, run_step, i)
+    finish_step(exec, r.code)
     results[i] = r
 
     if r.code ~= 0 then
@@ -98,7 +162,10 @@ function M.execute_parallel(spec, run_step)
 
   for i = 1, n do
     vim.schedule(function()
+      local cmd = shell.substitute(spec.steps[i], nil, spec.key)
+      local exec = step_execution(spec, i, cmd)
       local r = run_single(spec, run_step, i)
+      finish_step(exec, r.code)
       results[i] = r
 
       if r.code ~= 0 then
@@ -127,18 +194,35 @@ function M.execute_parallel(spec, run_step)
   return { ok = ok, results = results }
 end
 
--- Ejecuta un paso con jobstart (headless, sin buffer de terminal) y llama a
+-- Ejecuta un paso con el headless (sin buffer de terminal) y llama a
 -- on_exit(code) al terminar. Devuelve el job id (para tests con jobwait).
-function M.run_step(cmd, cwd, on_exit)
-  local opts = { on_exit = function(_, code)
-    on_exit(code)
-  end }
-
-  if cwd and cwd ~= "" then
-    opts.cwd = cwd
+-- `exec` (opcional): Execution running del paso; el exit la finaliza vía
+-- `result_handler` con guard de identidad ANTES de avisar al workflow.
+-- Sin `exec`, comportamiento legacy puro. Si el spawn falla, finaliza (-1)
+-- y avisa on_exit(-1) en vez de colgar (antes el on_exit nunca llegaba).
+function M.run_step(cmd, cwd, on_exit, exec)
+  local function finish_exec(code)
+    if exec ~= nil then
+      result_handler.complete(exec, { code = code, expected = exec.id })
+    end
   end
 
-  return vim.fn.jobstart(shell.wrap_command(cmd), opts)
+  local handle, serr = headless.spawn {
+    cmd = shell.wrap_command(cmd),
+    cwd = (cwd ~= nil and cwd ~= "") and cwd or nil,
+    on_exit = function(code)
+      finish_exec(code)
+      on_exit(code)
+    end,
+  }
+
+  if not handle then
+    finish_exec(-1)
+    on_exit(-1)
+    return nil
+  end
+
+  return handle.job
 end
 
 -- Corre una task por nombre (async) encadenando los pasos vía jobstart.
@@ -181,6 +265,7 @@ function M.run(name, on_done)
 
     local step = spec.steps[idx]
     local cmd = shell.substitute(step, nil, spec.key)
+    local exec = step_execution(spec, idx, cmd)
 
     M.run_step(cmd, spec.cwd, function(code)
       results[idx] = { cmd = cmd, code = code }
@@ -192,7 +277,7 @@ function M.run(name, on_done)
 
       idx = idx + 1
       next_step()
-    end)
+    end, exec)
   end
 
   next_step()
@@ -228,6 +313,7 @@ function M.run_parallel(spec, on_done)
 
       local step = spec.steps[i]
       local cmd = shell.substitute(step, nil, spec.key)
+      local exec = step_execution(spec, i, cmd)
 
       M.run_step(cmd, spec.cwd, function(code)
         results[i] = { cmd = cmd, code = code }
@@ -251,7 +337,7 @@ function M.run_parallel(spec, on_done)
         else
           try_launch()
         end
-      end)
+      end, exec)
     end
   end
 

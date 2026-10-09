@@ -378,10 +378,55 @@ B2  Runners depend on the process adapter `shell` ("describes, not executes")
 
 B3  Application couples to the Terminal Adapter directly        (§3)
       actions.lua                 -> terminal
-      workflow.lua                 (jobstart; produces {cmd, code})
+      workflow.lua                 (EXEC-009 slice 6: lifecycle via Engine +
+                                   headless adapter over jobstart; still
+                                   produces {cmd, code} per step)
 
 B4  `shell` is cross-layer: interpolation helper + process adapter; classified
     as Adapter, not Core. Duplicated `&&` parsing with Core `command.lua` (C9).
+
+EXEC-009 slices 1–6 (2026-10-09): terminal launches through the `process`
+port (terminal/pty.lua) and tracks jobs as Engine Executions with single
+event dispatch; workflow steps run as Engine Executions via headless.lua
+(same contract, used directly — no adapter registry yet). Residual second
+paths: workflow `run_step` contract still callback-based; `state.lua` legacy
+store still mirrors the Engine.
+
+## Authority: Engine decides, state.lua reflects (slice 8, 2026-10-09)
+
+```text
+Engine                  owns Execution transitions (created → … → terminal)
+state.lua               read-model projection for legacy/UI consumers
+                        (status/action/cwd/filetype/buf/code + run_id)
+events                  single emission per transition: tracking.dispatch()
+                        on Engine paths; legacy state.emit only where no
+                        Engine tracks (explicit compat branches)
+```
+
+```text
+run_id                  visible-session generation, terminal-scoped, for
+                        legacy stale guards. NOT Execution.id (Engine-global
+                        sequence, includes workflow steps). Never
+                        interchangeable; carried in parallel during migration.
+```
+
+Writers of `state.set`: terminal open/exit/cancel/replace (silent mirror
+when Engine tracks, emitting legacy otherwise) + `init._stop_silent`
+fallback when the buffer is already gone. Readers: running/buf/run_id
+guards, public `state()`, autocmd payloads (legacy shape).
+
+## Workflow execute* contract (slice 9, 2026-10-09)
+
+```text
+execute/execute_parallel   public sync deterministic orchestration core
+                           (steps + advance rules over injected run_step);
+                           transitions one Engine Execution per step.
+run/run_parallel           productive async paths: same policy + Engine
+                           lifecycle + headless spawn per step.
+```
+
+No parallel lifecycle anywhere: sync core and async paths share Engine
+transitions with identical step identity (`task.id(name, "step-N")`).
 ```
 
 These are intentional, documented migration candidates, not silent drift. Each

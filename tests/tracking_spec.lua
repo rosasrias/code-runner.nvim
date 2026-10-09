@@ -97,23 +97,54 @@ end)
 
 T.section("tracking: fallback explícito con && (punto 3)")
 
-T.it("chain && no trackea pero deja motivo observable", function()
+T.it("chain && se modela como el proceso spawneado (una Execution)", function()
   fresh()
 
   local id = tracking.start("javac X.java && java X", "java", "Build")
 
-  T.eq(nil, id, "sin Execution: legacy manda")
-  T.eq(nil, tracking.get(), "nada a medio inicializar")
+  T.truthy(id, "el chain ya no evade el Engine")
+  T.eq(nil, tracking.skip_reason(), "sin fallback: hay modelo explícito")
+  local exec = tracking.get()
+  T.eq("running", exec.status)
+end)
+
+T.it("el catálogo real con && se modela sin excepción silenciosa", function()
+  fresh()
+  local command = require "code-runner.command"
+  local shell = require "code-runner.shell"
+  local catalog = require("code-runner.actions").get_actions()
+
+  local chains, modeled = 0, 0
+  for _, entry in pairs(catalog) do
+    for _, label in ipairs(entry.__order or {}) do
+      local template = entry[label]
+      if type(template) == "string" and template:find("&&", 1, true) then
+        chains = chains + 1
+        local spec = command.normalize_spawn(template, shell.wrap_command(template))
+        if spec then
+          modeled = modeled + 1
+        end
+      end
+    end
+  end
+
+  T.truthy(chains > 0, "el catálogo tiene chains")
+  T.eq(chains, modeled, "todas modeladas, ninguna evade en silencio")
+end)
+
+T.it("sin modelo válido sigue el skip explícito (no error de ejecución)", function()
+  fresh()
+
+  T.eq(nil, tracking.start("", "go", "Run"))
   local skip = tracking.skip_reason()
-  T.truthy(skip, "fallback explícito")
   T.eq("command-no-normaliza", skip.reason)
-  T.falsy(skip.cmd == nil, "conserva el comando para diagnóstico")
+  T.eq(nil, tracking.get(), "nada a medio inicializar")
 end)
 
 T.it("un start válido limpia el skip anterior", function()
   fresh()
 
-  tracking.start("a && b", "go", "Run")
+  tracking.start("", "go", "Run")
   T.truthy(tracking.skip_reason())
 
   tracking.start("go run .", "go", "Run")

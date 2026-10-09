@@ -50,10 +50,11 @@ function M.spawn(opts)
     end
   end
 
-  local job = vim.fn.termopen(opts.cmd, term_opts)
+  local ok_call, job = pcall(vim.fn.termopen, opts.cmd, term_opts)
 
-  -- termopen devuelve 0 o -1 al fallar (el path legacy solo miraba -1).
-  if type(job) ~= "number" or job <= 0 then
+  -- termopen devuelve 0 o -1 al fallar (y puede lanzar con cwd inválido).
+  -- El path legacy solo miraba -1.
+  if not ok_call or type(job) ~= "number" or job <= 0 then
     return nil, "pty.spawn: termopen falló (" .. tostring(job) .. ")"
   end
 

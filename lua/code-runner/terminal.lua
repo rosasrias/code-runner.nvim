@@ -311,18 +311,36 @@ function M.open(cmd, direction, cwd, label, cleanup)
   vim.b[buf].code_runner_cleanup = cleanup or nil
   ui._apply_window_label(buf, ui._label_parts(label))
 
-  -- Estado central antes de lanzar: registra el job nuevo y su run_id. Los
-  -- on_exit de jobs anteriores (run_id viejo) no podrán pisar este estado.
-  state.set("running", {
-    action = label ~= "" and label or nil,
-    cwd = cwd,
-    filetype = entry_key,
-    buf = buf,
-  })
-  local rid = state.get().run_id
-
-  -- Tracking Engine (best-effort, dueño: `terminal/tracking.lua`).
+  -- Slice 8 (autoridad): el Engine transiciona PRIMERO; state espeja en
+  -- silencio y Start se publica DESPUÉS desde el tracking (una emisión).
+  -- `run_id` sigue siendo generación de sesión visible legacy (NO es
+  -- Execution.id: ver `terminal/tracking.lua`); convive en paralelo para los
+  -- guards legacy. Sin tracking (no modelable), rama legacy explícita que
+  -- emite como antes — compat identificada, no confundida con la gobernada.
+  -- Tracking Engine (dueño: `terminal/tracking.lua`).
   local exec_id = tracking.start(cmd, entry_key, label or "")
+  local rid
+
+  if exec_id ~= nil then
+    state.set("running", {
+      action = label ~= "" and label or nil,
+      cwd = cwd,
+      filetype = entry_key,
+      buf = buf,
+    }, { emit = false })
+    rid = state.get().run_id
+    tracking.dispatch()
+  else
+    -- Estado central antes de lanzar: registra el job nuevo y su run_id. Los
+    -- on_exit de jobs anteriores (run_id viejo) no podrán pisar este estado.
+    state.set("running", {
+      action = label ~= "" and label or nil,
+      cwd = cwd,
+      filetype = entry_key,
+      buf = buf,
+    })
+    rid = state.get().run_id
+  end
 
   -- termopen exige un buffer sin modificar: al reusar el buffer de la
   -- terminal, el job anterior dejó `modified` en al revisar.

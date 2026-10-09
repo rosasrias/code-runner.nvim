@@ -338,4 +338,190 @@ T.it("una task con steps se registra en el engine (no en el picker)", function()
   clean()
 end)
 
+T.section("workflow: ciclo de vida por el Engine (slice 6)")
+
+if vim.fn.executable "python" == 1 or PLATFORM_WIN then
+  T.it("run() conduce cada paso por running→success del Engine", function()
+    clean()
+    local engine = require "code-runner.engine"
+    local ok_cmd = PLATFORM_WIN and "cmd /c exit 0" or "true"
+    workflow.register({ name = "eng", steps = { ok_cmd, ok_cmd }, stop_on_fail = true })
+
+    local seen = {}
+    engine.set_listener(function(exec)
+      table.insert(seen, exec.status .. ":" .. exec.task_id)
+    end)
+
+    local final = nil
+    workflow.run("eng", function(result)
+      final = result
+    end)
+
+    local deadline = vim.loop.hrtime() + 10e9
+    while final == nil and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+    engine.set_listener(nil)
+
+    T.truthy(final and final.ok, "el workflow completa")
+    T.truthy(vim.tbl_contains(seen, "running:eng.step-1"), "paso 1 por el Engine")
+    T.truthy(vim.tbl_contains(seen, "success:eng.step-1"), "paso 1 finalizado")
+    T.truthy(vim.tbl_contains(seen, "running:eng.step-2"), "paso 2 por el Engine")
+    T.truthy(vim.tbl_contains(seen, "success:eng.step-2"), "sin segundo orquestador")
+    clean()
+  end)
+
+  T.it("dos corridas no comparten identidad de ejecución", function()
+    clean()
+    local engine = require "code-runner.engine"
+    local ok_cmd = PLATFORM_WIN and "cmd /c exit 0" or "true"
+    workflow.register({ name = "twice", steps = { ok_cmd }, stop_on_fail = true })
+
+    local ids = {}
+    engine.set_listener(function(exec)
+      if exec.status == "running" then
+        table.insert(ids, exec.id)
+      end
+    end)
+
+    local n = 0
+    local function once()
+      workflow.run("twice", function()
+        n = n + 1
+      end)
+    end
+    once()
+
+    local deadline = vim.loop.hrtime() + 10e9
+    while n < 1 and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+    once()
+    deadline = vim.loop.hrtime() + 10e9
+    while n < 2 and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+    engine.set_listener(nil)
+
+    T.eq(2, n, "ambas corridas completan")
+    T.eq(2, #ids, "una Execution running por corrida")
+    T.truthy(ids[1] ~= ids[2], "invocaciones distintas, ids distintos")
+    clean()
+  end)
+
+  T.it("fallo de spawn avisa on_exit(-1) en vez de colgar", function()
+    clean()
+    local code, count = nil, 0
+    local job = workflow.run_step("echo x", "/cwd/inexistente/cr_test", function(c)
+      code = c
+      count = count + 1
+    end)
+
+    T.eq(nil, job, "sin job válido")
+    T.eq(1, count, "on_exit llega igual")
+    T.eq(-1, code, "código de fallo de lanzamiento")
+    clean()
+  end)
+
+  T.it("paso con && corre como una Execution del proceso spawneado", function()
+    clean()
+    local engine = require "code-runner.engine"
+    local chain = PLATFORM_WIN and "cmd /c exit 0 && cmd /c exit 0" or "true && true"
+    workflow.register({ name = "chain", steps = { chain }, stop_on_fail = true })
+
+    local seen = {}
+    engine.set_listener(function(exec)
+      table.insert(seen, exec.status .. ":" .. exec.task_id)
+    end)
+
+    local final = nil
+    workflow.run("chain", function(result)
+      final = result
+    end)
+
+    local deadline = vim.loop.hrtime() + 10e9
+    while final == nil and vim.loop.hrtime() < deadline do
+      vim.wait(20)
+    end
+    engine.set_listener(nil)
+
+    T.truthy(final and final.ok, "el chain completa")
+    T.truthy(vim.tbl_contains(seen, "running:chain.step-1"), "trackeado, no legacy")
+    T.truthy(vim.tbl_contains(seen, "success:chain.step-1"), "un proceso, un Result")
+    clean()
+  end)
+else
+  T.skip("workflow Engine", "necesita una shell real (python/cmd)")
+end
+
+T.section("workflow: execute* honra el Engine (slice 9, contrato)")
+
+T.it("execute() transiciona cada paso: sin segundo ciclo de vida", function()
+  clean()
+  local engine = require "code-runner.engine"
+  local seen = {}
+  engine.set_listener(function(exec)
+    table.insert(seen, exec.status .. ":" .. exec.task_id)
+  end)
+
+  local res = workflow.execute(
+    { name = "sync", steps = { "a", "b" }, stop_on_fail = false },
+    function()
+      return 0
+    end
+  )
+  engine.set_listener(nil)
+
+  T.truthy(res.ok, "retorno intacto")
+  T.eq(2, #res.results)
+  T.truthy(vim.tbl_contains(seen, "running:sync.step-1"))
+  T.truthy(vim.tbl_contains(seen, "success:sync.step-1"))
+  T.truthy(vim.tbl_contains(seen, "running:sync.step-2"))
+  T.truthy(vim.tbl_contains(seen, "success:sync.step-2"))
+  clean()
+end)
+
+T.it("execute() clasifica el fallo en el Engine sin cambiar el retorno", function()
+  clean()
+  local engine = require "code-runner.engine"
+  local seen = {}
+  engine.set_listener(function(exec)
+    table.insert(seen, exec.status .. ":" .. exec.task_id)
+  end)
+
+  local res = workflow.execute(
+    { name = "syncfail", steps = { "bad" }, stop_on_fail = true },
+    function()
+      return 2
+    end
+  )
+  engine.set_listener(nil)
+
+  T.falsy(res.ok, "retorno intacto")
+  T.truthy(vim.tbl_contains(seen, "failed:syncfail.step-1"))
+  clean()
+end)
+
+T.it("execute_parallel() transiciona cada paso en el Engine", function()
+  clean()
+  local engine = require "code-runner.engine"
+  workflow.register({ name = "pareng", steps = { "a", "b" }, parallel = true })
+
+  local seen = {}
+  engine.set_listener(function(exec)
+    table.insert(seen, exec.status .. ":" .. exec.task_id)
+  end)
+
+  local res = workflow.execute(workflow.list().pareng, function()
+    vim.wait(1)
+    return 0
+  end)
+  engine.set_listener(nil)
+
+  T.truthy(res.ok, "retorno intacto")
+  T.truthy(vim.tbl_contains(seen, "success:pareng.step-1"))
+  T.truthy(vim.tbl_contains(seen, "success:pareng.step-2"))
+  clean()
+end)
+
 clean()

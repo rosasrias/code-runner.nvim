@@ -14,6 +14,8 @@
 -- lifecycle_events (contratos Core), nunca de buffer/UI/quickfix.
 local engine = require "code-runner.engine"
 local task = require "code-runner.task"
+local command = require "code-runner.command"
+local shell = require "code-runner.shell"
 local execution = require "code-runner.execution"
 local result_handler = require "code-runner.result_handler"
 local lifecycle_events = require "code-runner.lifecycle_events"
@@ -40,7 +42,18 @@ function M.start(cmd, entry_key, label)
     tid = "misc.run"
   end
 
-  local created, cerr = engine.create { task_id = tid, context = { filetype = entry_key }, command = cmd }
+  -- Slice 7: se modela LO SPAWNEADO. Comando único → spec directo; cadena
+  -- con `&&` → spec del argv envuelto (un proceso shell, un exit, una
+  -- Execution). Sin modelo válido, legacy explícito (skip_reason).
+  local argv = type(cmd) == "string" and shell.wrap_command(cmd) or nil
+  local spec, serr = command.normalize_spawn(cmd, argv)
+
+  if not spec then
+    last_skip = { reason = "command-no-normaliza", detail = tostring(serr), cmd = type(cmd) == "string" and cmd or nil }
+    return nil
+  end
+
+  local created, cerr = engine.create { task_id = tid, context = { filetype = entry_key }, command = spec }
 
   if not created then
     last_skip = { reason = "command-no-normaliza", detail = tostring(cerr), cmd = type(cmd) == "string" and cmd or nil }
@@ -71,6 +84,16 @@ function M.start(cmd, entry_key, label)
 
   current = running
   last_events = {}
+
+  -- Slice 8: la transición a running YA ocurrió en el Engine; se exponen sus
+  -- descriptores para que el llamador publique Start DESPUÉS (Engine primero,
+  -- emisión después). El llamador espeja state en silencio.
+  local ok_run, run_evts = pcall(lifecycle_events.for_transition, running)
+
+  if ok_run then
+    last_events = run_evts
+  end
+
   last_skip = nil
 
   return running.id

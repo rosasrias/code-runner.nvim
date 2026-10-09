@@ -815,8 +815,12 @@ Make terminal UI consume Execution output instead of owning execution lifecycle.
 ### Status
 
 ```text
-IN PROGRESS (slice 1 DONE, 2026-10-09)
+DONE (2026-10-09)
 ```
+
+Cierre: slices 1–9 verificados + auditoría final sin bloqueantes pendientes
+(ver slices y audit note abajo). Terminal y workflow comparten el Engine en
+sus caminos productivos; excepciones restantes explícitas y delimitadas.
 
 ### Resultado slice 1 — tracking Engine sobre el job real
 
@@ -935,8 +939,147 @@ clonadas). Sin vars, solo replay del comando guardado (siempre persistido).
   install, exit-code real 42, buf inválido, terminate con on_exit, send,
   dos jobs sin cruzar callbacks).
   Suite: 586 pass · 0 fail · 2 skip.
-- Resta de EXEC-009: workflow sobre el Engine, `events.emit` legacy sin
-  pcall (preexistente).
+### Slice 6 — workflow sobre el Engine con adapter headless (2026-10-09)
+
+- Nuevo `lua/code-runner/headless.lua`: contrato `process` sobre `jobstart`
+  (verificado con `process.validate_adapter`, intercambiable a nivel
+  contrato). Límites explícitos: stdout/stderr bufferizados disponibles pero
+  el workflow los ignora (como antes), `signal = nil`.
+- Decisión documentada: el headless NO se instala en el puerto global (lo
+  ocupa el PTY) ni se crea un registro de adaptadores — el workflow lo usa
+  directamente. Mismo contrato, sin segundo orquestador y sin unificar PTY
+  con headless. Si un tercer consumidor necesita selección dinámica, ahí sí
+  se justifica un dispatcher.
+- `workflow.run_step` acepta `exec` opcional y finaliza vía `result_handler`
+  con guard ANTES de avisar; `run`/`run_parallel` crean una Execution por
+  paso (`task.id(name, "step-N")`, una por invocación: sin cross-talk
+  estructural). El avance (stop_on_fail, concurrencia, `{cmd, code}`)
+  intacto: la política de secuencia NUNCA entra al Engine.
+- Fix de robustez probado por un test nuevo: `jobstart` con cwd inválido
+  LANZA E475 (no devuelve -1) — antes el workflow colgaba; ahora `on_exit`
+  recibe -1. Mismo `pcall` aplicado al `termopen` del PTY.
+- Sin grabación nueva: el workflow no registra historial ni emite eventos
+  (integraciones existentes, cero duplicación). Sin cambios de UI/API.
+- Tests: 5 en `headless_spec.lua` + 3 en `workflow_spec.lua` (lifecycle real
+  por listener, ids distintos por corrida, spawn fallido).
+  Suite: 594 pass · 0 fail · 2 skip.
+
+### Slice 7 — comandos compuestos `&&` (2026-10-09)
+
+Investigación (brief punto 1): las 7 cadenas son `compilar && ejecutar` —
+un solo proceso shell con un solo exit code. N Executions serían
+artificiales y no corresponderían al proceso real. Modelo explícito: UNA
+Execution cuyo comando es el ARGV spawneado.
+
+- `command.normalize_spawn(raw, argv)`: comando único → spec directo;
+  chain con `&&` → spec del argv envuelto (args opacos); sin `&&` ni parse
+  válido → `(nil, err)` sin fallback silencioso. Sin cambio de contrato
+  (reusa `normalize`/`validate`).
+- `tracking.start` y `step_execution` modelan lo spawneado (spec directo o
+  argv de `shell.wrap_command`); terminal y workflow trackean chains sin
+  cambiar spawn, replay, display ni dedup (el historial sigue guardando el
+  comando crudo). `skip_reason` queda solo para entradas genuinamente no
+  modelables (p.ej. string vacío).
+- La duplicación de parsing `&&` (C9) sigue como residual explícito fuera
+  de P1: esto no la unifica, solo elimina la evasión silenciosa.
+- Tests: 3 en `command_spec.lua` + 2 netos en `tracking_spec.lua`
+  (chain trackeado, aceptación sobre las 7 cadenas reales del catálogo,
+  skip vacío) + 1 E2E en `workflow_spec.lua` (paso chain por el Engine).
+  Suite: 600 pass · 0 fail · 2 skip.
+
+### Slice 8 — autoridad Engine-primero (2026-10-09)
+
+Auditoría previa: solo `terminal.lua` e `init._stop_silent` escriben state;
+leen guards + `state()` pública + autocmds. `run_id` = generación de sesión
+visible (solo terminal), NO `Execution.id` (secuencia global del Engine):
+no intercambiables, en paralelo durante la migración.
+
+- `tracking.start` expone descriptores del running; `terminal.open`
+  transiciona en el Engine PRIMERO, espeja `state.set(running, emit=false)`
+  y publica Start DESPUÉS vía `dispatch` (una emisión). Sin tracking, rama
+  legacy explícita que emite como antes (payload legacy con buf, identificada
+  en tests, no confundida con la gobernada).
+- Autoridad declarada en BOUNDARIES §16: Engine decide transiciones;
+  state.lua = proyección de lectura (quién escribe, quién emite, run_id vs
+  Execution.id, anti-divergencia por espejo silencioso + guards).
+- Tests: 4 en `terminal_spec.lua` (orden Engine→Start probado DENTRO del
+  callback de publicación, emisión única con payload del Engine,
+  run_id vs Execution.id, rama legacy identificada).
+  Suite: 604 pass · 0 fail · 2 skip.
+
+### Slice 9 — contrato de workflow.execute* (2026-10-09)
+
+Inspección: `execute/execute_parallel` reciben `run_step` inyectado —
+orquestación pura sin procesos; lo productivo es `run/run_parallel`.
+Clasificación elegida: API pública soportada como núcleo síncrono y
+determinista (pasos + avance); el Engine, puro y síncrono, no exige wrapper
+nuevo para transicionarlo.
+
+- `execute()` y `execute_parallel()` crean/finalizan una Execution por paso
+  (`step_execution` + `finish_step` con guard) alrededor del runner
+  inyectado; retornos `{ok, results}` intactos. Sin procesos, sin UI, sin
+  segundo ciclo de vida.
+- Tests: 3 de contrato en `workflow_spec.lua` (transiciones por paso con
+  listener, fallo clasificado, retornos intactos).
+  Suite: 607 pass · 0 fail · 2 skip.
+
+
+### Auditoría final EXEC-009 (2026-10-09, solo lectura)
+
+Diff auditado: f725576..HEAD + slices sin commitear (22 ficheros, +2137/-46
+commiteado; +200/-24 pendiente; 2 módulos y 2 specs nuevos sin trackear).
+Suite: 594 pass · 0 fail · 2 skip.
+
+Caminos trazados: terminal `open → state.set(running) → tracking.start →
+engine → pty → termopen`, `_on_exit → tracking.finish → espejo silencioso +
+dispatch`, `_close_current/open-reemplazo → mirror_cancel`; workflow
+`run/run_parallel → step_execution → engine → run_step → headless →
+jobstart`, avance intacto en el workflow. Sin segundo orquestador en los
+caminos async principales.
+
+Skips (2, ajenos a EXEC-009, preexistentes y de entorno): "solo Unix"
+(characterization, corre en Windows) y "pipeline Java" (sin JDK en PATH).
+
+Criterios slice 6: los 6 verificados con tests (lifecycle por listener,
+ids por corrida, spawn-fallo -1, sin duplicados, ambos adaptadores,
+regresión completa).
+
+Veredicto: P1 NO DONE. Bloqueantes mínimos (3):
+1. Cadenas `&&` del catálogo (7 usos reales: Compile & Run de C/C++,
+   Kotlin, Pascal, TS, Java + perfil release) corren el ciclo completo
+   fuera del Engine vía fallback silencioso. Cierre: modelar chain como N
+   executions secuenciales, o excepción de compat explícita con condición
+   de sunset en BOUNDARIES (hoy es implícita).
+2. `state.set(running)` emite Start ANTES de que el Engine conozca el job;
+   `state.lua` sigue co-fuente (run_id) en vez de espejo de lectura
+   declarado. Cierre: orden Engine-primero, o declarar state = read-model
+   en BOUNDARIES §16 (es lo que ya hace de facto).
+3. `workflow.execute/execute_parallel` (núcleo síncrono) fuera del Engine.
+   Hoy solo lo usan tests (verificado: cero llamadores productivos), pero
+   es API pública sin marca. Cierre: marcarlo harness-de-tests o enrutarlo.
+Sin estos, el número de tests (594) no basta per la regla de P1.
+
+### Cierre P1 — DONE (2026-10-09, revisión administrativa final)
+
+Los 3 bloqueantes se cerraron en slices 7–9 con evidencia (ver arriba):
+1. Chains `&&` modeladas como el proceso spawneado (una Execution, 7/7 del
+   catálogo, sin fallback silencioso) — slice 7.
+2. Engine-primero + `state.lua` como proyección de lectura declarada en
+   BOUNDARIES §16; rama legacy explícita e identificada — slice 8.
+3. `execute*` = núcleo síncrono público que transiciona el Engine; sin
+   segundo ciclo de vida en ningún camino — slice 9.
+
+Comprobaciones finales: ningún fichero de código/specs fuera de la
+auditoría (36 specs en disco = 36 registrados + runner helper); suite
+607 pass · 0 fail · 2 skip sobre el árbol final.
+
+Residuales aceptados (explícitos, delimitados, NO bloqueantes de P1):
+B1 runners→terminal, B2 runners→shell, C9 parsing `&&` duplicado,
+`events.emit` legacy sin pcall, `workflow.execute` compat de firma,
+`latex` jobstart detach. Splits diferidos (no P1): `init.lua` (466) y
+`terminal.lua` (378) por responsabilidad cuando toque, no por líneas.
+Criterio global cumplido: terminal y workflow comparten efectivamente el
+ciclo de vida en sus caminos productivos.
 
 ______________________________________________________________________
 

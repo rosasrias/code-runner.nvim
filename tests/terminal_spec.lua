@@ -611,4 +611,122 @@ T.it("quickfix sigue consumiendo el exit en el path trackeado", function()
   pcall(clean_windows)
 end)
 
+T.section("terminal: autoridad Engine-primero (EXEC-009 slice 8)")
+
+local function listen_8(pattern, store)
+  vim.api.nvim_create_autocmd("User", {
+    pattern = pattern,
+    callback = function(args)
+      table.insert(store, { pattern = pattern, data = args.data })
+    end,
+  })
+end
+
+T.it("el Engine transiciona antes de publicarse Start", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local engine = require "code-runner.engine"
+  state.reset()
+
+  local order = {}
+  engine.set_listener(function(exec)
+    if exec.status == "running" then
+      order[#order + 1] = "engine:running"
+    end
+  end)
+  listen_8("CodeRunnerStart", {})
+
+  -- el Start se publica solo si el Engine ya está en running
+  vim.api.nvim_create_autocmd("User", {
+    pattern = "CodeRunnerStart",
+    callback = function()
+      local exec = terminal.get_execution()
+      order[#order + 1] = (exec and exec.status == "running") and "emit:Start" or "emit:STALE"
+    end,
+  })
+
+  terminal.open("echo 'orden'", "horizontal", nil, "Run")
+  engine.set_listener(nil)
+
+  T.eq({ "engine:running", "emit:Start" }, order)
+
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("open emite Start una sola vez con payload del Engine", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  state.reset()
+
+  local seen = {}
+  listen_8("CodeRunnerStart", seen)
+  listen_8("CodeRunnerExit", seen)
+
+  terminal.open("echo 'uno'", "horizontal", nil, "Run")
+
+  local starts, exits = {}, {}
+  for _, e in ipairs(seen) do
+    if e.pattern == "CodeRunnerStart" then
+      starts[#starts + 1] = e
+    elseif e.pattern == "CodeRunnerExit" then
+      exits[#exits + 1] = e
+    end
+  end
+
+  T.eq(1, #starts, "un solo Start")
+  T.eq(0, #exits, "el exit aún no ocurrió")
+  T.eq(terminal.get_execution().task_id, starts[1].data.action, "identidad, no label")
+  T.eq(nil, starts[1].data.buf, "el buf lo decide la terminal, no el evento")
+  T.eq("running", state.get().status, "el espejo conserva el estado")
+
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("run_id legacy e id de Execution no son intercambiables", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  state.reset()
+
+  terminal.open("echo 'a'", "horizontal", nil, "Run")
+  local r1, t1 = state.get().run_id, terminal.get_execution().id
+  terminal._close_current(vim.api.nvim_get_current_buf())
+
+  terminal.open("echo 'b'", "horizontal", nil, "Run")
+  local r2, t2 = state.get().run_id, terminal.get_execution().id
+  terminal._close_current(vim.api.nvim_get_current_buf())
+
+  T.eq(r1 + 1, r2, "run_id: generación de sesión visible (+1 por lanzamiento)")
+  T.truthy(t1 ~= t2, "Execution.id fresco por invocación")
+  T.eq("number", type(r1), "run_id numérico legacy")
+  state.reset()
+  pcall(clean_windows)
+end)
+
+T.it("rama legacy sin tracking emite como antes e identificada", function()
+  clean_runner_buffers()
+  local state = require "code-runner.state"
+  local quickfix = require "code-runner.quickfix"
+  local orig = quickfix.handle
+  quickfix.handle = function() return 0 end
+  state.reset()
+
+  local seen = {}
+  listen_8("CodeRunnerStart", seen)
+
+  terminal.open("", "horizontal")
+
+  T.eq("running", state.get().status)
+  T.eq(1, #seen, "un solo Start legacy")
+  T.truthy(seen[1].data.buf ~= nil, "payload legacy (con buf), no el del Engine")
+
+  quickfix.handle = orig
+  terminal._close_current(vim.api.nvim_get_current_buf())
+  state.reset()
+  pcall(clean_windows)
+end)
+
 pcall(clean_windows)
