@@ -6,6 +6,21 @@ local buffer = require "code-runner.terminal.buffer"
 
 local M = {}
 
+-- Fondo de la terminal igual al de NvimTree (darker_black).
+-- Sin esto la terminal usa el Normal del editor (black), visiblemente
+-- más claro que el sidebar. Opt-out: terminal.winhighlight = "".
+function M._apply_term_bg(win)
+  if not vim.api.nvim_win_is_valid(win) then
+    return
+  end
+  local hl = config.options.terminal.winhighlight
+  if hl == nil then
+    return
+  end
+  -- "" limpia el heredado del split (los splits heredan winhighlight).
+  vim.wo[win].winhighlight = hl
+end
+
 -- Crea la ventana para la terminal según la dirección configurada.
 function M._open_window(direction)
   local main = buffer.get_main_window()
@@ -16,7 +31,7 @@ function M._open_window(direction)
     local cols = vim.o.columns
     local lines = vim.o.lines
 
-    vim.api.nvim_open_win(vim.api.nvim_get_current_buf(), true, {
+    local win = vim.api.nvim_open_win(vim.api.nvim_get_current_buf(), true, {
       relative = "editor",
       width = math.floor(cols * cfg.width),
       height = math.floor(lines * cfg.height),
@@ -25,6 +40,7 @@ function M._open_window(direction)
       style = "minimal",
       border = "rounded",
     })
+    M._apply_term_bg(win)
     return
   end
 
@@ -35,6 +51,7 @@ function M._open_window(direction)
     vim.cmd "vsplit"
     vim.cmd("vertical resize " .. config.options.terminal.vertical_width)
   end
+  M._apply_term_bg(vim.api.nvim_get_current_win())
 end
 
 -- Cierra la terminal si terminó con éxito (autoclose). Nunca deja la

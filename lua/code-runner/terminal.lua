@@ -13,6 +13,7 @@ M.BUF_NAME = buffer.BUF_NAME
 -- Re-export de la UI y de los helpers de buffer para conservar la API pública
 -- y lo que usan los tests (terminal._open_window, _label_parts, ...).
 M._open_window = ui._open_window
+M._apply_term_bg = ui._apply_term_bg
 M._maybe_autoclose = ui._maybe_autoclose
 M._label_parts = ui._label_parts
 M._apply_window_label = ui._apply_window_label
@@ -175,6 +176,8 @@ function M.open(cmd, direction, cwd, label, cleanup)
 
   if term_win then
     vim.api.nvim_set_current_win(term_win)
+    -- Reaplica el fondo (ventanas creadas antes del fix no lo tienen).
+    ui._apply_term_bg(term_win)
     local candidate = vim.api.nvim_win_get_buf(term_win)
 
     if state.get().status == "running" then
