@@ -33,9 +33,13 @@ M.defaults = {
     hl_title = "ExBlue",
     hl_status_ok = "ExGreen",
     hl_status_err = "ExYellow",
-    -- Fondo de la ventana de la terminal: por default solo el bg del título
-    -- (grupo CodeRunnerTermBg, derivado de CodeRunnerTermTitle). El texto
-    -- no se toca. Vacío ("") desactiva el override y deja el fondo Normal.
+    -- Color del mensaje final "[Process exited N]": azul si termina OK,
+    -- rojo si termina con error.
+    hl_exit_ok = "ExBlue",
+    hl_exit_err = "ExRed",
+    -- Fondo de la ventana de la terminal: por default solo el bg de
+    -- NvimTreeNormal (oscuro). El texto no se toca (queda claro).
+    -- Vacío ("") desactiva el override y deja el fondo Normal del editor.
     winhighlight = "Normal:CodeRunnerTermBg,NormalNC:CodeRunnerTermBg,NormalFloat:CodeRunnerTermBg,FloatBorder:CodeRunnerTermBg,EndOfBuffer:CodeRunnerTermBg,WinSeparator:CodeRunnerTermBg",
     -- Cerrar la terminal al terminar con éxito (exit code 0).
     -- Con false (default) la terminal se queda abierta, muestra la salida y

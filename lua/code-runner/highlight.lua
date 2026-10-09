@@ -25,6 +25,12 @@ local GROUPS = {
   CodeRunnerTermErr = function()
     return config.options.terminal.hl_status_err
   end,
+  CodeRunnerExitOk = function()
+    return config.options.terminal.hl_exit_ok
+  end,
+  CodeRunnerExitErr = function()
+    return config.options.terminal.hl_exit_err
+  end,
 }
 
 -- Define (o reasocia) los grupos de resaltado del plugin. No sobreescribe

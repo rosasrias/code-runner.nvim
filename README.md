@@ -77,7 +77,7 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
       hl_title = "ExBlue", -- color del título (grupos "Ex*" del tema ecotic)
       hl_status_ok = "ExGreen", -- estado "✓ terminó OK · q cierra"
       hl_status_err = "ExYellow", -- estado "✗ error N · q cierra"
-      winhighlight = "Normal:CodeRunnerTermBg,...", -- solo bg del titulo (texto intacto); "" = Normal del editor
+      winhighlight = "Normal:CodeRunnerTermBg,...", -- solo bg de NvimTreeNormal (texto intacto); "" = Normal del editor
       autoclose = false, -- false: queda abierta al terminar, cierra con q; true: se cierra sola si termina OK
     },
     autosave = true,
@@ -159,6 +159,8 @@ personalizás en un solo lugar desde tu capa de highlights:
 | `CodeRunnerTermTitle` | `terminal.hl_title` | título `⚡ CodeRunner · Terminal` |
 | `CodeRunnerTermOk` | `terminal.hl_status_ok` | estado `✓ terminó OK · q cierra` |
 | `CodeRunnerTermErr` | `terminal.hl_status_err` | estado `✗ error N · q cierra` |
+| `CodeRunnerExitOk` | `terminal.hl_exit_ok` | `[Process exited 0]` (azul) |
+| `CodeRunnerExitErr` | `terminal.hl_exit_err` | `[Process exited N]` (rojo) |
 
 Ejemplo: título de la terminal con **fondo azul y texto negro**, desde tu
 override de highlights (base46/NvChad, `lua/plugins/highlights.lua`):

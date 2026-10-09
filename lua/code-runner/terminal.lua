@@ -66,6 +66,55 @@ function M._close_current(buf)
   end
 end
 
+-- Mensaje final "[Process exited N]" con color: el core lo muestra como
+-- virtual text sin color (namespace "nvim.terminal.exitmsg"). Este hook lo
+-- reemplaza solo en terminales del plugin: azul si exit 0, rojo si error.
+local EXITMSG_NS = vim.api.nvim_create_namespace "code-runner.exitmsg"
+local CORE_EXITMSG_NS = "nvim.terminal.exitmsg"
+
+-- Pinta el mensaje final de `buf` según `code`. Expuesto para tests.
+function M._apply_exitmsg(buf, code, pos)
+  if not vim.api.nvim_buf_is_valid(buf) then
+    return
+  end
+
+  local ok_core, core_ns = pcall(vim.api.nvim_create_namespace, CORE_EXITMSG_NS)
+  if ok_core then
+    pcall(vim.api.nvim_buf_clear_namespace, buf, core_ns, 0, -1)
+  end
+  pcall(vim.api.nvim_buf_clear_namespace, buf, EXITMSG_NS, 0, -1)
+
+  if type(code) ~= "number" then
+    code = -1
+  end
+
+  local hl = code == 0 and "CodeRunnerExitOk" or "CodeRunnerExitErr"
+  local virt = { virt_text = { { ("[Process exited %d]"):format(code), hl } }, virt_text_pos = "overlay" }
+  local ok = pcall(vim.api.nvim_buf_set_extmark, buf, EXITMSG_NS, pos, 0, virt)
+
+  if not ok then
+    pcall(vim.api.nvim_buf_set_extmark, buf, EXITMSG_NS, vim.api.nvim_buf_line_count(buf) - 1, 0, virt)
+  end
+end
+
+-- Instala el hook una sola vez (augroup con clear): solo actúa en buffers
+-- del plugin, el resto de terminales siguen con el mensaje del core.
+function M._hook_exitmsg()
+  local group = vim.api.nvim_create_augroup("CodeRunnerExitMsg", { clear = true })
+
+  vim.api.nvim_create_autocmd("TermClose", {
+    group = group,
+    callback = function(ev)
+      if not buffer.has_marker(ev.buf) then
+        return
+      end
+
+      local data = ev.data or {}
+      M._apply_exitmsg(ev.buf, vim.v.event.status, data.pos)
+    end,
+  })
+end
+
 -- Estado final visible en la ventana y mensaje claro de cómo cerrarla
 -- (tanto para compilación como para ejecución o ambas).
 function M._exit_hint(buf, code, qf_count)

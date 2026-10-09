@@ -335,18 +335,46 @@ T.it("_open_window aplica winhighlight del titulo a la terminal", function()
   clean_windows()
 end)
 
-  T.it("solo aplica el bg del titulo: el texto no se toca", function()
+  T.it("solo aplica el bg de NvimTree: el texto no se toca", function()
     vim.cmd "only"
-    vim.api.nvim_set_hl(0, "CodeRunnerTermTitle", { fg = "#000000", bg = "#61afef" })
+    vim.api.nvim_set_hl(0, "NvimTreeNormal", { fg = "#abb2bf", bg = "#1b1f27" })
     terminal._open_window "horizontal"
 
-    local _, title_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermTitle", link = true })
+    local _, src_hl = pcall(vim.api.nvim_get_hl, 0, { name = "NvimTreeNormal", link = true })
     local ok, bg_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermBg" })
     T.truthy(ok and bg_hl.bg, "grupo de fondo definido")
-    T.eq(title_hl.bg, bg_hl.bg, "bg igual al del titulo")
+    T.eq(src_hl.bg, bg_hl.bg, "bg igual al de NvimTree")
     T.eq(nil, bg_hl.fg, "sin fg: el texto no se toca")
 
     clean_windows()
+  end)
+
+  T.it("exitmsg azul en exito y rojo en error, reemplaza el del core", function()
+    local tbuffer = require "code-runner.terminal.buffer"
+    local buf = vim.api.nvim_create_buf(false, true)
+    vim.b[buf][tbuffer.PLUGIN_MARK] = true
+
+    local core_ns = vim.api.nvim_create_namespace "nvim.terminal.exitmsg"
+    local our_ns = vim.api.nvim_create_namespace "code-runner.exitmsg"
+    vim.api.nvim_buf_set_extmark(buf, core_ns, 0, 0, {
+      virt_text = { { "[Process exited 0]", nil } },
+      virt_text_pos = "overlay",
+    })
+
+    terminal._apply_exitmsg(buf, 0, 0)
+
+    T.eq(0, #vim.api.nvim_buf_get_extmarks(buf, core_ns, 0, -1, {}), "quita el mensaje del core")
+    local ours = vim.api.nvim_buf_get_extmarks(buf, our_ns, 0, -1, { details = true })
+    T.eq(1, #ours, "pone el propio")
+    T.eq("[Process exited 0]", ours[1][4].virt_text[1][1])
+    T.eq("CodeRunnerExitOk", ours[1][4].virt_text[1][2], "azul en exito")
+
+    terminal._apply_exitmsg(buf, 1, 0)
+    ours = vim.api.nvim_buf_get_extmarks(buf, our_ns, 0, -1, { details = true })
+    T.eq("[Process exited 1]", ours[1][4].virt_text[1][1])
+    T.eq("CodeRunnerExitErr", ours[1][4].virt_text[1][2], "rojo en error")
+
+    pcall(vim.api.nvim_buf_delete, buf, { force = true })
   end)
 
 T.it("winhighlight vacio desactiva el fondo del titulo", function()

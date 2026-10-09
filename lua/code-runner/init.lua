@@ -21,6 +21,7 @@ M.setup = function(opts)
 	end
 
 	require("code-runner.highlight").setup()
+	require("code-runner.terminal")._hook_exitmsg()
 end
 
 local function autosave()

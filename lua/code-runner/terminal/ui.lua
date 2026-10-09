@@ -18,14 +18,14 @@ function M._apply_term_bg(win)
     return
   end
   if hl ~= "" then
-    -- Solo el fondo del titulo: resuelve su bg efectivo y lo aplica en un
-    -- grupo propio sin fg, asi el texto de la terminal no se toca. Se
-    -- resuelve en cada apertura: sigue al tema (incluye recargas) y no
-    -- depende de base46. Sin bg en el titulo, el grupo queda vacio y la
+    -- Solo el fondo de NvimTreeNormal (oscuro): resuelve su bg efectivo y lo
+    -- aplica en un grupo propio sin fg, asi el texto de la terminal (claro)
+    -- no se toca. Se resuelve en cada apertura: sigue al tema (incluye
+    -- recargas) y no depende de base46. Sin bg, el grupo queda vacio y la
     -- terminal usa su fondo normal.
-    local ok, title_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermTitle", link = true })
-    if ok and title_hl and title_hl.bg then
-      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = title_hl.bg })
+    local ok, nvimtree_hl = pcall(vim.api.nvim_get_hl, 0, { name = "NvimTreeNormal", link = true })
+    if ok and nvimtree_hl and nvimtree_hl.bg then
+      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = nvimtree_hl.bg })
     else
       vim.api.nvim_set_hl(0, "CodeRunnerTermBg", {})
     end
