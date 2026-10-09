@@ -37,9 +37,10 @@ M.defaults = {
     -- rojo si termina con error.
     hl_exit_ok = "ExBlue",
     hl_exit_err = "ExRed",
-    -- Fondo de la ventana de la terminal: por default solo el bg de
-    -- NvimTreeNormal (oscuro). El texto no se toca (queda claro).
-    -- Vacío ("") desactiva el override y deja el fondo Normal del editor.
+    -- Fondo de la ventana de la terminal: por default solo el bg oscuro
+    -- del tema (darker_black: el mismo de NvimTree y del float de volt).
+    -- El texto no se toca (queda claro). No depende de haber abierto
+    -- NvimTree. Vacío ("") desactiva el override.
     winhighlight = "Normal:CodeRunnerTermBg,NormalNC:CodeRunnerTermBg,NormalFloat:CodeRunnerTermBg,FloatBorder:CodeRunnerTermBg,EndOfBuffer:CodeRunnerTermBg,WinSeparator:CodeRunnerTermBg",
     -- Cerrar la terminal al terminar con éxito (exit code 0).
     -- Con false (default) la terminal se queda abierta, muestra la salida y

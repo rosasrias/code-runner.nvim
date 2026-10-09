@@ -6,9 +6,34 @@ local buffer = require "code-runner.terminal.buffer"
 
 local M = {}
 
--- Fondo de la terminal igual al de NvimTree (darker_black).
--- Sin esto la terminal usa el Normal del editor (black), visiblemente
--- más claro que el sidebar. Opt-out: terminal.winhighlight = "".
+-- Resuelve el bg oscuro del tema (el mismo de NvimTree, NormalFloat y el
+-- float de volt): primero la variable del tema, que siempre está disponible
+-- sin necesidad de haber abierto NvimTree. Si no, el grupo NvimTreeNormal
+-- en runtime (solo existe si NvimTree ya abrió).
+local function theme_dark_bg()
+  if vim.g.base46_cache then
+    local ok_cache, colors = pcall(dofile, vim.g.base46_cache .. "colors")
+    if ok_cache and type(colors) == "table" and colors.darker_black then
+      return colors.darker_black
+    end
+  end
+
+  local ok_base46, base46 = pcall(require, "base46")
+  if ok_base46 then
+    local ok_tb, tb = pcall(base46.get_theme_tb, "base_30")
+    if ok_tb and type(tb) == "table" and tb.darker_black then
+      return tb.darker_black
+    end
+  end
+
+  local ok_hl, hl = pcall(vim.api.nvim_get_hl, 0, { name = "NvimTreeNormal", link = true })
+  if ok_hl and hl and hl.bg then
+    return hl.bg
+  end
+
+  return nil
+end
+
 function M._apply_term_bg(win)
   if not vim.api.nvim_win_is_valid(win) then
     return
@@ -18,14 +43,12 @@ function M._apply_term_bg(win)
     return
   end
   if hl ~= "" then
-    -- Solo el fondo de NvimTreeNormal (oscuro): resuelve su bg efectivo y lo
-    -- aplica en un grupo propio sin fg, asi el texto de la terminal (claro)
-    -- no se toca. Se resuelve en cada apertura: sigue al tema (incluye
-    -- recargas) y no depende de base46. Sin bg, el grupo queda vacio y la
-    -- terminal usa su fondo normal.
-    local ok, nvimtree_hl = pcall(vim.api.nvim_get_hl, 0, { name = "NvimTreeNormal", link = true })
-    if ok and nvimtree_hl and nvimtree_hl.bg then
-      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = nvimtree_hl.bg })
+    -- Solo el fondo oscuro del tema en un grupo propio sin fg: el texto de
+    -- la terminal (claro) no se toca. Sin bg disponible, el grupo queda
+    -- vacio y la terminal usa su fondo normal.
+    local bg = theme_dark_bg()
+    if bg then
+      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = bg })
     else
       vim.api.nvim_set_hl(0, "CodeRunnerTermBg", {})
     end

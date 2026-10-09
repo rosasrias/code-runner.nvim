@@ -335,6 +335,31 @@ T.it("_open_window aplica winhighlight del titulo a la terminal", function()
   clean_windows()
 end)
 
+  T.it("usa darker_black del tema sin haber abierto NvimTree", function()
+    vim.cmd "only"
+    -- NvimTree sin abrir: grupo sin bg
+    vim.api.nvim_set_hl(0, "NvimTreeNormal", {})
+
+    local tmpdir = vim.fn.tempname()
+    vim.fn.mkdir(tmpdir, "p")
+    local cache = tmpdir .. "/base46/"
+    vim.fn.mkdir(cache, "p")
+    local f = assert(io.open(cache .. "colors", "w"))
+    f:write('return { darker_black = "#1b1f27" }')
+    f:close()
+
+    local prev_cache = vim.g.base46_cache
+    vim.g.base46_cache = cache
+    terminal._open_window "horizontal"
+
+    local ok, bg_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermBg" })
+    T.truthy(ok and bg_hl.bg, "fondo aplicado sin NvimTree abierto")
+    T.eq(nil, bg_hl.fg, "sin fg: el texto no se toca")
+
+    vim.g.base46_cache = prev_cache
+    vim.fn.delete(tmpdir, "rf")
+    clean_windows()
+  end)
   T.it("solo aplica el bg de NvimTree: el texto no se toca", function()
     vim.cmd "only"
     vim.api.nvim_set_hl(0, "NvimTreeNormal", { fg = "#abb2bf", bg = "#1b1f27" })
