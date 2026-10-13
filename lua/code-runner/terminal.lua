@@ -247,9 +247,11 @@ end
 -- cwd (opcional): directorio en el que arranca el job (raíz del proyecto).
 -- label (opcional): acción elegida (Run/Build) para el título de la ventana.
 -- cleanup (opcional): lista de rutas a borrar al terminar el job.
+-- task_id (opcional): identidad ya resuelta que el tracking usa tal cual
+-- (switch de selección); sin ella se deriva de key+label como antes.
 -- Devuelve el exec_id del tracking (o nil si el comando no se modeló como
 -- Execution): el llamador lo usa para identidad sin leer estado global.
-function M.open(cmd, direction, cwd, label, cleanup)
+function M.open(cmd, direction, cwd, label, cleanup, task_id)
   direction = direction or config.options.terminal.direction
 
   -- Maven/Gradle Wrapper (proyecto): `mvn`→`mvnw`, `gradle`→`gradlew` si el
@@ -317,8 +319,9 @@ function M.open(cmd, direction, cwd, label, cleanup)
   -- Execution.id: ver `terminal/tracking.lua`); convive en paralelo para los
   -- guards legacy. Sin tracking (no modelable), rama legacy explícita que
   -- emite como antes — compat identificada, no confundida con la gobernada.
-  -- Tracking Engine (dueño: `terminal/tracking.lua`).
-  local exec_id = tracking.start(cmd, entry_key, label or "")
+  -- Tracking Engine (dueño: `terminal/tracking.lua`). Con task_id resuelto
+  -- por el llamador se usa tal cual (switch de selección); si no, se deriva.
+  local exec_id = tracking.start(cmd, entry_key, label or "", task_id)
   local rid
 
   if exec_id ~= nil then

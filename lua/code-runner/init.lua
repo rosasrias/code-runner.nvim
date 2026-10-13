@@ -34,7 +34,7 @@ local function autosave()
 	end
 end
 
-local function execute_action(action, vars, cwd, key, label)
+local function execute_action(action, vars, cwd, key, label, task_id)
 	local shell = require("code-runner.shell")
 	local terminal = require("code-runner.terminal")
 
@@ -47,10 +47,10 @@ local function execute_action(action, vars, cwd, key, label)
 	end
 
 	local cmd = shell.substitute(action, vars, key)
-	local exec_id = terminal.open(cmd, nil, cwd, label)
-	-- Identidad (EXEC-009 slice 2): el open devuelve el exec_id que trackeó.
-	-- Se usa el id devuelto (no el global) para no leer tracking obsoleto
-	-- cuando open está stubbeado o el comando no normalizó.
+	local exec_id = terminal.open(cmd, nil, cwd, label, nil, task_id)
+	-- Identidad (switch de selección): el open devuelve el exec_id que
+	-- trackeó. Se usa el id devuelto (no el global) para no leer tracking
+	-- obsoleto cuando open está stubbeado o el comando no normalizó.
 	local exec = terminal.get_execution()
 
 	if exec == nil or exec.id ~= exec_id then
@@ -58,9 +58,16 @@ local function execute_action(action, vars, cwd, key, label)
 	end
 
 	local idopts = nil
+	local resolved_id = (type(task_id) == "string" and task_id ~= "") and task_id
+		or (exec ~= nil and exec.task_id or nil)
 
-	if exec ~= nil and exec.task_id ~= nil then
-		idopts = { task_id = exec.task_id, execution_id = exec.id, status = exec.status, vars = vars }
+	if resolved_id ~= nil then
+		idopts = {
+			task_id = resolved_id,
+			execution_id = exec ~= nil and exec.id or nil,
+			status = exec ~= nil and exec.status or nil,
+			vars = vars,
+		}
 	end
 
 	require("code-runner.history").add(cmd, cwd, key, idopts)
@@ -97,6 +104,55 @@ local function project_cwd(key)
 	end
 
 	return require("code-runner.project").resolve(key)
+end
+
+-- Proyección de la entry actual a tasks con identidad (switch de selección).
+-- Devuelve mapa label -> { task_id, template }. Los labels ausentes van por
+-- la rama legacy explícita (closures ejecutoras). El picker muestra
+-- `entry.__order` intacto: misma presentación, identidad gobernada.
+local function resolve_key_tasks(key, entry)
+	local runner_mod = require("code-runner.runner")
+	local resolve_mod = require("code-runner.resolve")
+	local project_mod = require("code-runner.project")
+	local task_mod = require("code-runner.task")
+
+	local spec = runner_mod.from_catalog_entry(key, entry, project_mod.markers_for(key), config.options.icons)
+
+	if spec == nil then
+		return {}
+	end
+
+	local norm = runner_mod.new(spec)
+
+	if norm == nil then
+		return {}
+	end
+
+	local res = resolve_mod.resolve({ runners = { norm }, context = { filetype = key, extension = key } })
+
+	if res == nil then
+		return {}
+	end
+
+	local by_id = {}
+
+	for _, c in ipairs(res.candidates) do
+		for _, t in ipairs(c.tasks) do
+			by_id[t.id] = t
+		end
+	end
+
+	local map = {}
+
+	for _, label in ipairs(entry.__order or {}) do
+		local t = by_id[task_mod.id(key, label)]
+
+		if t ~= nil and type(entry[label]) == "string" then
+			map[label] = { task_id = t.id, template = t.command }
+		end
+	end
+
+	return map
 end
 
 local function build_entry(actions, terminal)
@@ -143,15 +199,28 @@ function M.build_run()
 	end
 	require("code-runner.projectrc").load(rc_key)
 
-	local entry, key = build_entry(actions.get_actions(), terminal)
+	local actions_table = actions.get_actions()
+	local entry, key = build_entry(actions_table, terminal)
 
 	if not entry then
 		return
 	end
 
+	-- Switch de selección: poblar registry built-in ANTES de decorar (el
+	-- test contextual es por-buffer y no pertenece al registro global).
+	-- Idempotente; customs con ids distintos sobreviven.
+	require("code-runner.runners").seed(actions_table, {
+		markers_for = require("code-runner.project").markers_for,
+		icons = config.options.icons,
+	})
+
 	local cctx = context.detect(key)
 	local test_item = context.decorate(entry, key, cctx)
 	local cwd = project_cwd(key)
+
+	-- Identidad gobernada para ESTA entry (incluye el test decorado, que sí
+	-- es seleccionable aquí). El picker muestra `entry.__order` tal cual.
+	local resolved = resolve_key_tasks(key, entry)
 
 	-- Título contextual: "⚡ CodeRunner · App.java" (+ · main:nn si hay entry)
 	local fname = vim.fn.expand("%:t")
@@ -175,6 +244,7 @@ function M.build_run()
 		end
 
 		local vars = context_vars(cctx)
+		local item = resolved[choice]
 
 		last_choice = {
 			lang = key,
@@ -183,15 +253,24 @@ function M.build_run()
 			cmd = test_item and choice == test_item.label and test_item.cmd or nil,
 			cwd = cwd,
 			vars = vars,
+			-- Identidad gobernada por resolución (no re-derivada). Sin item
+			-- (closure legacy), nil: rama legacy explícita abajo.
+			task_id = item ~= nil and item.task_id or nil,
 		}
 
 		remember_choice(last_choice)
+
+		if item ~= nil then
+			execute_action(item.template, vars, cwd, key, choice, item.task_id)
+			return
+		end
+
+		-- Rama legacy explícita: la acción es una closure ejecutora (java,
+		-- tex, ps1/bat...). Se invoca como antes hasta su migración; no se
+		-- descarta ni se finge TaskSpec.
 		local exec = execute_action(entry[choice], vars, cwd, key, choice)
 
-		-- Identidad (slice 2): si el job corre como Execution, last lleva su
-		-- task_id. `run_last` sigue re-ejecutando el comando (comportamiento
-		-- intacto); la resolución por task_id es slice 3.
-		if exec ~= nil and exec.task_id ~= nil then
+		if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
 			last_choice.task_id = exec.task_id
 			remember_choice(last_choice)
 		end
@@ -240,7 +319,8 @@ function M.run_last()
 				last_choice.vars or { ["$testName"] = last_choice.test },
 				last_choice.cwd,
 				last_choice.lang,
-				def.label
+				def.label,
+				def.task_id
 			)
 			return
 		end
@@ -252,7 +332,8 @@ function M.run_last()
 			last_choice.vars or { ["$testName"] = last_choice.test },
 			last_choice.cwd,
 			last_choice.lang,
-			last_choice.choice
+			last_choice.choice,
+			last_choice.task_id
 		)
 
 		if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
@@ -270,7 +351,7 @@ function M.run_last()
 		return
 	end
 
-	local exec = execute_action(action, last_choice.vars, last_choice.cwd, last_choice.lang, last_choice.choice)
+	local exec = execute_action(action, last_choice.vars, last_choice.cwd, last_choice.lang, last_choice.choice, last_choice.task_id)
 
 	if last_choice.task_id == nil and exec ~= nil and exec.task_id ~= nil then
 		last_choice.task_id = exec.task_id
@@ -325,12 +406,12 @@ function M.run_history()
 			local def = resolve_stored(choice.task_id, choice.key, choice.vars, nil)
 
 			if def ~= nil then
-				execute_action(def.template, choice.vars, choice.cwd, choice.key, def.label)
+				execute_action(def.template, choice.vars, choice.cwd, choice.key, def.label, def.task_id)
 				return
 			end
 		end
 
-		local exec = execute_action(choice.cmd, nil, choice.cwd, choice.key)
+		local exec = execute_action(choice.cmd, nil, choice.cwd, choice.key, nil, choice.task_id)
 
 		-- Si el historial no traía identidad, toma la del tracking nuevo.
 		-- Nunca degrada una existente (label nil deriva solo la key).

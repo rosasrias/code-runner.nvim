@@ -345,10 +345,11 @@ If these questions cannot be answered clearly, the module is not ready to be add
 
 ______________________________________________________________________
 
-# 16. Current Migration State (ARCH-007, 2026-09-01)
+# 16. Current Migration State (ARCH-007 baseline 2026-09-01, updated through 2026-10-12)
 
 This document describes the *target* boundaries. Not every module has migrated
-yet. The following is the current (real) state as validated by ARCH-007.
+yet. The following is the current (real) state as validated by ARCH-007,
+plus the documented migration deltas (EXEC-009 slices, RUN-001/002).
 
 ## Clean Core (match §2)
 
@@ -427,6 +428,21 @@ run/run_parallel           productive async paths: same policy + Engine
 
 No parallel lifecycle anywhere: sync core and async paths share Engine
 transitions with identical step identity (`task.id(name, "step-N")`).
+
+## Selection switch (2026-10-10): identity governed, presentation kept
+
+```text
+picker display            legacy __order verbatim (labels, order, behavior)
+identity per label        projected RunnerSpec task (stable task_id) or
+                          explicit legacy branch (executor closures: java,
+                          tex, ps1/bat — invoked as before, no task_id)
+execution                 template + task_id end-to-end (override, never
+                          re-derived); run_last/run_history resolve by id
+                          (registry-first with refresh, catalog fallback)
+```
+
+`open_runner/notify` injection (B1-by-injection) and label-keyed
+`registry.apply` (C7) remain ONLY for the explicit legacy branch.
 ```
 
 These are intentional, documented migration candidates, not silent drift. Each

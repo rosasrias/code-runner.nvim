@@ -368,7 +368,7 @@ T.it("build_run con tracking guarda task_id en historial y last", function()
   config.options = vim.deepcopy(config.defaults)
 end)
 
-T.it("build_run sin tracking registra legacy sin identidad", function()
+T.it("build_run sin tracking gobierna identidad por resolución", function()
   local terminal = require "code-runner.terminal"
   local picker = require "code-runner.picker"
   local history = require "code-runner.history"
@@ -382,9 +382,12 @@ T.it("build_run sin tracking registra legacy sin identidad", function()
   history._data_file = htmp
   require("code-runner.terminal.tracking").reset()
 
-  -- open stub legacy: devuelve nil (sin tracking, p.ej. chain &&)
+  -- open stub legacy: devuelve nil (sin tracking, p.ej. comando no
+  -- modelable). La identidad IGUAL viene de la resolución (switch).
   local orig_select, orig_open = picker.select, terminal.open
+  local chosen_label = nil
   picker.select = function(items, _, cb)
+    chosen_label = items[1]
     cb(items[1])
   end
   terminal.open = function()
@@ -392,16 +395,17 @@ T.it("build_run sin tracking registra legacy sin identidad", function()
   end
 
   local ok = pcall(cr.build_run)
-  T.truthy(ok, "build_run no lanza")
-
   local items = history.list()
-  T.eq(1, #items)
-  T.eq(nil, items[1].task_id, "legacy sin identidad, como antes")
 
   picker.select, terminal.open = orig_select, orig_open
   history._data_file = saved_hist
   pcall(os.remove, htmp)
   config.options = vim.deepcopy(config.defaults)
+
+  T.truthy(ok, "build_run no lanza")
+  T.eq(1, #items)
+  T.eq(require("code-runner.task").id("lua", chosen_label), items[1].task_id,
+    "identidad gobernada por resolución aunque no haya tracking")
 end)
 
 T.section("init: resolución operativa por task_id (EXEC-009 slice 3)")
@@ -598,6 +602,115 @@ T.it("re-lanzar desde historial crea ejecución nueva (no reutiliza id)", functi
 
   history._data_file = saved_hist
   tracking.reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.section("init: switch de selección (identidad gobernada)")
+
+T.it("el picker recibe etiquetas y orden idénticos al legacy", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+
+  local f = tmpdir .. "/switch.lua"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  local legacy_order = table.concat(require("code-runner.actions").get_actions().lua.__order, "\n")
+
+  local orig_select, orig_open = picker.select, terminal.open
+  local shown = nil
+  picker.select = function(items, _, cb)
+    shown = items
+    cb(items[1])
+  end
+  terminal.open = function()
+    return nil
+  end
+
+  pcall(cr.build_run)
+
+  picker.select, terminal.open = orig_select, orig_open
+
+  T.truthy(shown, "picker invocado")
+  T.eq(legacy_order, table.concat(shown, "\n"), "presentación intacta")
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("la identidad viene de la resolución, no del tracking", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+  local history = require "code-runner.history"
+  local last = require "code-runner.last"
+  local tracking = require "code-runner.terminal.tracking"
+
+  local f = tmpdir .. "/switch_id.lua"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  local saved_hist, saved_last = history._data_file, last._data_file
+  history._data_file, last._data_file = os.tmpname(), os.tmpname()
+  tracking.reset()
+
+  local orig_select, orig_open = picker.select, terminal.open
+  picker.select = function(items, _, cb)
+    cb(items[1])
+  end
+  terminal.open = function()
+    return nil
+  end
+
+  pcall(cr.build_run)
+
+  picker.select, terminal.open = orig_select, orig_open
+
+  local persisted = last.get()
+  local items = history.list()
+  T.truthy(persisted and persisted.task_id, "last con task_id sin tracking")
+  T.eq(1, #items)
+  T.eq(persisted.task_id, items[1].task_id, "misma identidad en ambos")
+  T.truthy(persisted.task_id:find("^lua%.", 1) == 1, "id estable por key")
+
+  history._data_file, last._data_file = saved_hist, saved_last
+  tracking.reset()
+  config.options = vim.deepcopy(config.defaults)
+end)
+
+T.it("closure legacy: se ejecuta por la rama explícita sin task_id", function()
+  local terminal = require "code-runner.terminal"
+  local picker = require "code-runner.picker"
+  local registry = require "code-runner.actions.registry"
+
+  local f = tmpdir .. "/switch_fn.lua"
+  vim.fn.writefile({ "print(1)" }, f)
+  vim.cmd("edit " .. vim.fn.fnameescape(f))
+
+  registry.reset()
+  _G.CR_SWITCH_FN = false
+  cr.register_action {
+    id = "fntool",
+    filetypes = { "lua" },
+    kind = "run",
+    run = function()
+      _G.CR_SWITCH_FN = true
+    end,
+  }
+
+  local orig_select = picker.select
+  picker.select = function(items, _, cb)
+    for _, l in ipairs(items) do
+      if l:find("fntool", 1, true) then
+        cb(l)
+        return
+      end
+    end
+  end
+
+  pcall(cr.build_run)
+
+  picker.select = orig_select
+  T.truthy(_G.CR_SWITCH_FN, "la closure se ejecutó por la vía legacy")
+  _G.CR_SWITCH_FN = nil
+  registry.reset()
   config.options = vim.deepcopy(config.defaults)
 end)
 

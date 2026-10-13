@@ -1,11 +1,17 @@
 -- Resolución operativa por Task ID (EXEC-009 slice 3).
 --
 -- Convierte un `task_id` persistido (historial/last) en la definición ACTUAL
--- de la tarea: `{ label, template, key }`. Así `run_last`/`run_history`
+-- de la tarea: `{ task_id, label, template, key }`. Así `run_last`/`run_history`
 -- re-sustituyen la plantilla vigente con los parámetros persistidos, en vez
 -- de reejecutar a ciegas el comando sustituido en su día.
 --
 -- Dos fuentes, en orden:
+--   0. Runner Registry (switch de selección): lookup directo por id estable,
+--      sin etiquetas ni orden del catálogo. Antes de consultar se re-siembran
+--      los built-ins (idempotente): el registry refleja el catálogo vigente y
+--      una semilla vieja nunca ensombrece una plantilla nueva. Customs con
+--      ids distintos sobreviven; en colisión manda el built-in (el override
+--      custom va por config/actions.registry, que fluye al seed).
 --   1. Catálogo (acciones normales y custom): se busca el label cuyo
 --      `task.id(lang, label)` coincide. La comparación es por identidad
 --      estable, nunca por etiqueta cruda (un cambio de iconos no rompe).
@@ -41,7 +47,67 @@ function M.resolve(task_id, opts)
   local lang = opts.lang or ""
 
   local catalog_ok, actions_mod = pcall(require, "code-runner.actions")
-  local entry = catalog_ok and actions_mod.get_actions()[lang] or nil
+  local catalog = catalog_ok and actions_mod.get_actions() or nil
+
+  -- 0. Runner Registry: lookup directo por id (estable, sin etiquetas).
+  -- Antes de consultar se re-siembran los built-ins (idempotente, UNA vez):
+  -- el registry siempre refleja el catálogo VIGENTE; una semilla vieja nunca
+  -- ensombrece una plantilla nueva. Customs con ids distintos sobreviven;
+  -- en colisión de id manda el built-in (el override custom va por
+  -- config/actions.registry, que fluye al seed).
+  if catalog_ok and catalog ~= nil then
+    local ok_r, runners = pcall(require, "code-runner.runners")
+
+    if ok_r then
+      local ok_p, project = pcall(require, "code-runner.project")
+      local icons = nil
+      local ok_c, config = pcall(require, "code-runner.config")
+
+      if ok_c then
+        icons = config.options.icons
+      end
+
+      pcall(runners.seed, catalog, {
+        markers_for = ok_p and project.markers_for or nil,
+        icons = icons,
+      })
+    end
+  end
+
+  do
+    local reg_ok, registry = pcall(require, "code-runner.runner_registry")
+
+    if reg_ok then
+      local ids = {}
+
+      for id in pairs(registry.list()) do
+        ids[#ids + 1] = id
+      end
+
+      table.sort(ids)
+
+      for _, rid in ipairs(ids) do
+        local rspec = registry.get(rid)
+
+        for _, t in ipairs(rspec and rspec.tasks or {}) do
+          if t.id == task_id then
+            if type(t.command) ~= "string" then
+              return nil, "command-funcion"
+            end
+
+            return {
+              task_id = t.id,
+              template = t.command,
+              label = t.name,
+              key = (rspec.filetypes or {})[1] or lang,
+            }, nil
+          end
+        end
+      end
+    end
+  end
+
+  local entry = catalog_ok and catalog[lang] or nil
 
   if entry == nil then
     return nil, "no-catalog-entry"
@@ -56,7 +122,7 @@ function M.resolve(task_id, opts)
         return nil, "command-funcion"
       end
 
-      return { label = label, template = template, key = lang }, nil
+      return { task_id = task_id, label = label, template = template, key = lang }, nil
     end
   end
 
@@ -72,7 +138,7 @@ function M.resolve(task_id, opts)
       end
 
       if task.id(lang, label) == task_id then
-        return { label = label, template = cmd, key = lang }, nil
+        return { task_id = task_id, label = label, template = cmd, key = lang }, nil
       end
     end
   end

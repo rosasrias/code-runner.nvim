@@ -1,9 +1,9 @@
 -- Tracking de Execution sobre el job real de la terminal (EXEC-009).
 --
 -- La terminal consume el Engine y lanza por el puerto `process` (adapter PTY,
--- slice 5). Todo es best-effort: si el comando no normaliza (p.ej. chain
--- `&&`), el tracking se omite y el path legacy (state/quickfix/buffer)
--- sigue mandando.
+-- slice 5). Todo es best-effort: si el comando no se modela (slice 7 cubre
+-- chains `&&` como el argv spawneado), el tracking se omite con `skip_reason`
+-- y el path legacy (state/quickfix/buffer) sigue mandando.
 --
 -- Este módulo es el único dueño de `current_exec`; `terminal.lua` solo delega.
 -- No registra historial al salir: el registro vive al lanzar
@@ -35,8 +35,15 @@ local last_skip = nil
 -- identidad de la invocación (`id`, única por lanzamiento). Si había una
 -- Execution running anterior (reemplazo), se cancela primero: ninguna queda
 -- colgada en running.
-function M.start(cmd, entry_key, label)
-  local tid = task.id(entry_key or "", label or "")
+-- `task_id_override` (opcional, switch de selección): identidad ya resuelta
+-- por el llamador (registry/resolver). Si viene no-vacío se usa tal cual en
+-- vez de derivarla del label; la invocación sigue siendo fresca.
+function M.start(cmd, entry_key, label, task_id_override)
+  local tid = task_id_override
+
+  if type(tid) ~= "string" or tid == "" then
+    tid = task.id(entry_key or "", label or "")
+  end
 
   if tid == "" then
     tid = "misc.run"

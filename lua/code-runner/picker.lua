@@ -34,7 +34,7 @@ local function volt_pick(items, opts, on_choice, volt)
   ---------------------------------------------------------
   -- Dimensiones (el título también cuenta: si no, nvim lo trunca con "<")
   ---------------------------------------------------------
-  local title_text = " " .. (opts.title or "CodeRunner") .. " "
+  local title_text = "  " .. (opts.title or "CodeRunner") .. " "
   local content_w = api.nvim_strwidth(title_text)
   content_w = math.max(content_w, api.nvim_strwidth(opts.prompt or ""))
 

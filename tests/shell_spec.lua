@@ -280,3 +280,23 @@ T.it("cwd vacío/nil no rompe y no sustituye", function()
   T.eq("mvn test", shell.use_wrappers("mvn test", ""))
   T.eq("mvn test", shell.use_wrappers("mvn test"))
 end)
+
+T.it("$exeSuffix refleja la plataforma sin ramificar plantillas", function()
+  shell.IS_WIN = true
+  T.eq("prog.exe", shell.substitute("prog$exeSuffix", {}))
+  shell.IS_WIN = false
+  T.eq("prog", shell.substitute("prog$exeSuffix", {}))
+  shell.IS_WIN = IS_WIN_BACKUP
+end)
+
+T.it("$exeSuffix adyacente a $fileBase no se fusiona mal", function()
+  shell.IS_WIN = true
+  local win_out = shell.substitute('go build -o "$fileBase$exeSuffix"', {})
+  shell.IS_WIN = false
+  local unix_out = shell.substitute('go build -o "$fileBase$exeSuffix"', {})
+  shell.IS_WIN = IS_WIN_BACKUP
+
+  T.truthy(win_out:sub(-5) == '.exe"', "en Windows termina en .exe: " .. win_out)
+  T.truthy(unix_out:sub(-5) ~= '.exe"', "fuera termina sin .exe: " .. unix_out)
+  T.eq(win_out:sub(1, -6) .. '"', unix_out, "solo difieren en el sufijo")
+end)

@@ -4,7 +4,7 @@ The roadmap is organized around architectural maturity rather than feature quant
 
 ______________________________________________________________________
 
-# P0 — Architecture Foundation
+# P0 — Architecture Foundation — DONE 2026-09-01
 
 Goal:
 
@@ -32,11 +32,12 @@ Exit criteria:
 
 ______________________________________________________________________
 
-# P1 — Execution Core
+# P1 — Execution Core — DONE 2026-10-09
 
 Goal:
 
-Create one reliable execution engine.
+Create one reliable execution engine. (Met: terminal and workflow share
+the Engine on their productive paths; see TODO.md P1 closure.)
 
 ## Tasks
 
@@ -58,7 +59,7 @@ Standalone tasks and future workflows can share the same execution engine.
 
 ______________________________________________________________________
 
-# P2 — Runner Architecture
+# P2 — Runner Architecture — IN PROGRESS (RUN-001 DONE, RUN-002 closed 2026-10-12)
 
 Goal:
 
@@ -67,15 +68,16 @@ Make language/ecosystem support modular.
 ## Tasks
 
 ```text
-RUN-001 Runner contract
-RUN-002 Runner registry
-RUN-003 Built-in runner loader
-RUN-004 Go migration
-RUN-005 Rust migration
-RUN-006 Python migration
-RUN-007 JavaScript/TypeScript migration
-RUN-008 Java migration
-RUN-009 remaining runner migration
+RUN-001 Runner contract (DONE: declarative RunnerSpec + pure validation)
+RUN-002 Runner registry (closed: pure resolver + runtime registry + seed;
+      productive switch with explicit compat; vertical migration deferred)
+RUN-003 Built-in runner loader (TODO)
+RUN-004 Go migration (TODO: first vertical probe, own criteria)
+RUN-005 Rust migration (TODO)
+RUN-006 Python migration (TODO)
+RUN-007 JavaScript/TypeScript migration (TODO)
+RUN-008 Java migration (TODO)
+RUN-009 remaining runner migration (TODO)
 ```
 
 The first few runners are architecture probes.

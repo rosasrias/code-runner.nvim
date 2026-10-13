@@ -143,6 +143,17 @@ remove obsolete implementation-specific test
 
 Tests should verify behavior and contracts rather than private implementation details whenever possible.
 
+## Test isolation rules
+
+- Restore global stubs BEFORE assertions that can abort the test. The
+  runner aborts a test on the first failed assert, so restoring at the end
+  leaks stubs and cascades secondary failures that hide the real defect.
+  Order: capture results → restore globals → assert.
+- Seeded or shared registries must never shadow fresher definitions.
+  Refresh at resolve time (or pin the seed) and test that re-resolving
+  picks up template changes. Precedence and freshness are contract, not
+  secondary details.
+
 ______________________________________________________________________
 
 # Documentation

@@ -1070,30 +1070,216 @@ Los 3 bloqueantes se cerraron en slices 7–9 con evidencia (ver arriba):
    segundo ciclo de vida en ningún camino — slice 9.
 
 Comprobaciones finales: ningún fichero de código/specs fuera de la
-auditoría (36 specs en disco = 36 registrados + runner helper); suite
+auditoría (41 specs en disco = 41 registrados en run.lua, verificado por
+diff el 2026-10-12); suite
 607 pass · 0 fail · 2 skip sobre el árbol final.
 
 Residuales aceptados (explícitos, delimitados, NO bloqueantes de P1):
 B1 runners→terminal, B2 runners→shell, C9 parsing `&&` duplicado,
-`events.emit` legacy sin pcall, `workflow.execute` compat de firma,
-`latex` jobstart detach. Splits diferidos (no P1): `init.lua` (466) y
-`terminal.lua` (378) por responsabilidad cuando toque, no por líneas.
+`events.emit` legacy sin pcall, `latex` jobstart detach. Nota 2026-10-12:
+`workflow.execute` salió de esta lista (slice 9 lo enruta por el Engine).
+Splits diferidos (no P1): `init.lua` (547) y
+`terminal.lua` (381) por responsabilidad cuando toque, no por líneas.
 Criterio global cumplido: terminal y workflow comparten efectivamente el
 ciclo de vida en sus caminos productivos.
+
+Nota de conteos (2026-10-12): los totales intermedios por slice son
+snapshots del runner al momento, no un ledger contable. Vale lo
+verificable hoy: 41 specs en disco = 41 registrados en `run.lua`; total
+certificado 665 pass · 2 fail (ambientales C) · 2 skip, leído del runner
+en corridas independientes. No se reconstruyen sumas históricas exactas.
 
 ______________________________________________________________________
 
 # P2 — Runner Architecture
 
-## RUN-001 — Runner Contract
+## RUN-001 — Runner Contract (declarative RunnerSpec)
 
-Implement documented Runner contract.
+Status:
+
+```text
+DONE (2026-10-09)
+```
+
+Scope: define the declarative `RunnerSpec` contract (`lua/code-runner/
+runner.lua`: id, filetypes, project marker names, TaskSpecs — no function
+values, no filesystem access, no infrastructure imports) with pure
+validation, plus a conformance test characterizing current runners
+WITHOUT migrating them and WITHOUT behavior changes.
+
+Acceptance (all verified):
+1. RunnerSpec is declarative data; no executor closures, no infra deps.
+2. Current runners inspectable via conformance test (declarative subset
+   vs coupled closures identified).
+3. Pure validation with identifiable errors (bad IDs, malformed tasks,
+   inconsistent declarations, unknown keys).
+4. Specs execute nothing, query no filesystem, import no infra modules.
+5. Picker flow, context selection and execution behavior untouched.
+6. Docs state who declares/resolves/detects/executes (CONTRACTS §4,
+   ADR-016).
+
+Result: `runner.lua` (~200 lines, Core-pure, only requires `task.lua`);
+`tests/runner_spec.lua` (12 tests: 8 contract + 4 characterization incl.
+java/tex coupled paths pinned and pure-string subset proven convertible).
+Suite: 619 pass · 0 fail · 2 skip. No latex/projectrc/registry changes
+(deferred per brief — contract first, migration later).
 
 ______________________________________________________________________
 
 ## RUN-002 — Runner Registry
 
-Implement built-in and runtime runner registration.
+Status: closed administratively (2026-10-12, veredicto explícito).
+
+Alcance cerrado: resolver puro + bordes A/B + registro runtime + seed
+built-in + switch de selección con compat explícita (arriba). El registro
+built-in/runtime pendiente del título original y la migración vertical
+pasan a slices futuros con criterios independientes (primero: inventario de
+closures y paridad funcional por ruta, sin big-bang).
+
+### Base previa — resolver puro de candidatos (2026-10-10)
+
+`lua/code-runner/resolve.lua` (Core puro, solo requiere `runner.lua`):
+`resolve({ runners, context })` → `{ candidates }` determinista, sin tocar
+filesystem ni ejecutar nada. Política (ADR-017): filetype/extension = 2pts,
+marker = 1pt, 0pts = no candidato; orden score↓, id↑; tareas con
+`enabled=false` o filetypes incompatibles excluidas; mismo task id en dos
+runners se conserva con su runner (nada oculto); sin coincidencias =
+`{ candidates = {} }` explícito. Disponibilidad de herramientas diferida
+(requeriría extender RunnerSpec: decisión separada, RUN-001 no se reabre).
+
+Tests: `tests/resolve_spec.lua` (13). Cero cambios de comportamiento
+(ficheros nuevos + 1 línea en `run.lua`).
+
+### Integración caracterizada con datos reales (2026-10-10, sin cambiar selección)
+
+- `runner_registry.lua`: registro runtime por id estable (espeja el patrón
+  de `task_registry`; simplificado: `register` siempre normaliza, sin doble
+  vía). Vacío por defecto; el catálogo legacy manda en producción.
+- `runner.from_catalog_entry` (precedente `task.from_catalog`): proyecta
+  `{label→cmd}` a RunnerSpec plano; omite funciones con reporte explícito;
+  alias `"R"` omitido con motivo (no duplica declaración).
+- `project.markers_for(key)`: accesor aditivo de solo lectura (cero
+  comportamiento) para el puente.
+- Caracterización: TODO el catálogo proyecta (0 roturas, funciones
+  reportadas), go+go.mod resuelve primero con puntaje 3, desconocido vacío,
+  determinista total. Selección productiva (picker por labels) intacta.
+- Tests: 6 registry + 3 `from_catalog_entry` + 4 caracterización real.
+  Suite: 650 pass + 2 fail ambientales C (registrados) · 2 skip.
+
+### Registro built-in poblado, selección intacta (2026-10-10)
+
+- `runners.seed(catalog, { markers_for, icons })`: proyecta el catálogo a
+  RunnerSpecs y los registra en `runner_registry`. Puro respecto a inputs
+  (no requiere actions/terminal/proyecto); orden determinista (keys
+  ordenadas, `pairs` es aleatorio); idempotente; todo omitido contabilizado
+  (entradas por motivo, acciones-función por conteo).
+- La selección productiva NO lo usa todavía: el picker sigue leyendo el
+  catálogo legacy (pinneado label por label antes/después del seed).
+- Tests: 7 en `runners_spec.lua` (incl. R reportado sin duplicar y
+  separación verificada). Suite: 657 pass + 2 fail ambientales · 2 skip.
+
+### Migración vertical Go: declaración + paridad (2026-10-13, sin retirar)
+
+- Hallazgo previo: `go build` incrusta `EXE_SUFFIX` evaluado en runtime —
+  una declaración estática no puede ramificar por plataforma sin importar
+  infra. Salida: variable `$exeSuffix` en el adaptador shell (el OS vive
+  en el adaptador, no en el runner; sin cambiar el shape del spec).
+- `runners/go.lua`: run + build 1:1 del catálogo (`go run "%"`,
+  `go build -o "$fileBase$exeSuffix"`), ids que coinciden con los
+  derivados hoy de los labels. Test contextual excluido a propósito (vive
+  en el sistema de contexto, migra con él).
+- Sin cableado productivo: ni picker, ni seed, ni resolución lo consumen
+  (descubrimiento = RUN-003). Paridad probada: misma sustitución legacy vs
+  declarada, mismos ids, misma resolución.
+- Tests: 4 paridad Go + 2 `$exeSuffix`. Suite: 673 pass · 0 fail · 2 skip
+  (los E2E de C pasaron en esta corrida: bloqueo intermitente, episodio ya
+  registrado).
+
+### Batch `when`: preconditions y OS como dato (2026-10-13, una decisión)
+
+- ADR-018: `when = { os = "win"|"unix", tools = {...} }` opcional por tarea,
+  conjunción; el resolver evalúa contra disponibilidad inyectada; sin datos
+  = exclusión explícita; fallbacks (pwsh|powershell) como variantes
+  explícitas, no ramas ocultas.
+- `runner.lua` valida forma + copia (sin tocar `task.lua`: P1 congelado);
+  `resolve.lua` honra en `visible_tasks`. Sin sondeos en specs.
+- Tests: 4 validación + 5 resolución. Suite: 682 pass · 0 fail · 2 skip.
+  Desbloquea md/html/ps1/bat; adaptadores tex/java/cs y holdouts siguen
+  su orden. Sin cableado productivo, sin commit.
+
+### Adaptador texMain puro con paridad (2026-10-13, sin cablear)
+
+- `context/tex.lua`: `main_file({current, lines})` puro (precedente
+  `context/test.lua`); misma pattern que el legacy, primera directiva manda.
+  Desvío intencional documentado: forma canónica forward-slash en vez del
+  `:p` con backslashes (determinista multiplataforma, más segura citada).
+- Paridad semántica contra `detect_main_tex` real (buffer editado): sin
+  directiva, root simple, espacios raros, `..`, backslashes, primera-manda.
+- Tests: 8 en `tex_spec.lua`. `latex.lua` intacto y mandando en producción.
+  Suite: 690 pass · 0 fail · 2 skip.
+
+### Switch de selección con compat explícita (2026-10-10)
+
+- `build_run`: siembra built-ins (pre-decorate, idempotente), proyecta la
+  entry y resuelve a identidad; el picker muestra `__order` intacto. Cada
+  label con TaskSpec ejecuta plantilla+task_id; closures van por rama
+  legacy explícita (se ejecutan como antes, sin task_id, sin fingirse).
+- `tracking.start`/`terminal.open`/`execute_action` aceptan task_id
+  explícito (opcional, compatible); la identidad ya no se re-deriva.
+- `task_resolve`: registry-first con re-seed al resolver (frescura:
+  semilla vieja nunca ensombrece); en colisión manda el built-in (override
+  por config/actions.registry); fallback a catálogo y test reconstruido.
+  Por registry el label es el `name` estable (presentación separada).
+- Criterios 1–6 verificados: picker idéntico, contexto ya detectado,
+  task_id estable de punta a punta, run_last/history por id, closures con
+  política explícita, caracterización vieja verde.
+- Hallazgos del propio switch (tests): cascada por restore-tras-assert
+  (test viejo actualizado al contrato nuevo) y staleness del seed
+  (resuelto con re-seed al resolver). Suite: 665 pass + 2 fail
+  ambientales · 2 skip.
+
+### Bordes cerrados sin ampliar RunnerSpec (2026-10-10)
+
+A. `enabled`: ausente = incluido (pinneado), `false` = exclusión explícita,
+   otro tipo = error de validación (vía `task.validate`, sin conversión);
+   la fuente es el propio TaskSpec, nada externo. `condition` rechazado en
+   cualquier tipo (la disponibilidad condicional se declara con
+   filetypes/markers).
+B. Puntaje inequívoco: una categoría suma una sola vez (filetype+extensión
+   = 2, no 4); "." inicial ignorado en señales de lenguaje, markers
+   exactos; ids minúsculas por contrato → desempate total sin
+   equivalencias ocultas. Tests que lo pinnean en ambos specs.
+
+### Bloqueo ambiental formal: 2 e2e de C (2026-10-10, NO regresión)
+
+Repro: `nvim --headless -l tests/run.lua` → fallan "plantilla nativa de C"
+y "compilar con un error" (`vim.v.shell_error` = 1). Causa: Windows App
+Control bloquea `gcc.exe` (WinGet WinLibs) — "Una directiva de Control de
+aplicaciones bloqueó este archivo" al invocarlo directo. Evidencia de
+bisección: el mismo par falla en árbol limpio (stash) con idéntico error.
+Decisión: NO se tocan ni se marcan skip (son contrato). Estado aceptado a
+esa fecha: suite no-E2E completa en verde salvo estos 2 fail ambientales
+preexistentes (conteo de ese momento; el total certificado vigente está en
+la nota de aceptación siguiente). Cierre de RUN-002 pendiente de corrida
+en entorno con gcc habilitado, o aceptación formal con esta evidencia +
+toda la suite no-E2E verde (esta nota es ese registro).
+
+### Aceptación ambiental formal (2026-10-12, alcance limitado)
+
+Se acepta continuar el trabajo arquitectónico SIN esperar otra máquina, con
+estos límites explícitos (no equivalen a suite verde):
+- Los 2 fail de C siguen siendo fallos de la ejecución actual; constan como
+  bloqueo ambiental conocido, no como aprobados.
+- La evidencia aceptada: bisección en árbol limpio + error directo de App
+  Control + suite final 665 pass · 2 fail (solo esos 2) · 2 skip en el árbol
+  final (toda la suite no-E2E verde, incluidos todos los tests nuevos de P2).
+- Actualización 2026-10-12: re-corrida tras el dedup de `task_resolve` dio
+  667 pass · 0 fail · 2 skip (los 2 E2E de C pasaron: el bloqueo es
+  intermitente, no permanente). El registro de arriba queda como evidencia
+  del episodio; el estado vigente es suite completa verde.
+- Si gcc se habilita en este entorno, la validación completa pendiente es
+  re-correr esos 2 E2E y registrar el resultado; ningún otro gate depende
+  de ellos.
 
 ______________________________________________________________________
 

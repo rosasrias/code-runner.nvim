@@ -98,6 +98,19 @@ function M.resolve(key)
   return M.find_from(dir, key) or dir
 end
 
+-- Nombres de marcadores declarados para una key (copia, solo lectura).
+-- Inspección para el puente RunnerSpec (RUN-002): NO detecta nada en FS,
+-- solo expone lo ya declarado. Vacío si la key no declara.
+function M.markers_for(key)
+  local out = {}
+
+  for _, m in ipairs(KEY_MARKERS[key] or {}) do
+    out[#out + 1] = m
+  end
+
+  return out
+end
+
 M._detect = detect
 
 return M

@@ -293,3 +293,69 @@ AI work is organized into bounded tasks with explicit scope and acceptance crite
 ## Reason
 
 Large ambiguous instructions encourage agents to modify unrelated parts of the system and introduce architectural drift.
+
+# ADR-016 — RunnerSpec is declarative data
+
+Status: Accepted
+
+## Decision
+
+A Runner declares capabilities and tasks (`RunnerSpec`: id, filetypes,
+project marker names, TaskSpecs) with no function values and no
+infrastructure dependencies. Split of responsibilities:
+
+```text
+declares   RunnerSpec
+resolves   Task Resolver (from an already-detected context)
+detects    adapters (filesystem, executables)
+executes   Execution Engine
+```
+
+## Reason
+
+Detection criteria must be inspectable without running detection, and
+tasks must be reusable without the runner that declared them. Behavior
+(conditions, function commands) belongs to the resolver phase, not the spec.
+
+______________________________________________________________________
+
+# ADR-017 — Candidate resolution is scored and deterministic
+
+Status: Accepted
+
+## Decision
+
+The pure resolver (`resolve.lua`) scores runners per signal (filetype or
+extension hit: 2; project marker hit: 1; 0 = not a candidate) and orders by
+score desc, runner id asc, declared task order. No match is an explicit
+empty candidate list, never nil or an error. Registration order never
+influences the result; duplicate task ids across runners are kept with
+their runner (never silently hidden).
+
+## Reason
+
+Multi-candidate policy must be predictable without depending on load or
+registration order. Scoring documents relevance (both signals beat one)
+while keeping the output a pure function of declared runners + detected
+context.
+
+______________________________________________________________________
+
+# ADR-018 — Availability conditions are data, not behavior
+
+Status: Accepted
+
+## Decision
+
+A task may declare `when = { os = "win"|"unix", tools = { ... } }`
+(optional, all fields optional, conjunction). The resolver evaluates it
+against injected availability data (`{ os, tools }` set); detection never
+runs inside specs. Missing evaluation data excludes the task — never
+silent permissiveness. Multi-variant fallback (e.g. pwsh|powershell) is
+modeled as explicit variant tasks, not hidden runtime branching.
+
+## Reason
+
+Tool/OS guards already exist scattered in closures (md, html, ps1, bat).
+Centralizing them as data keeps RunnerSpec declarative, makes the policy
+testable without processes, and forces each fallback to be visible.

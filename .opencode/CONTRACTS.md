@@ -123,6 +123,24 @@ modify quickfix
 render picker UI
 ```
 
+The declarative form of a Runner is `RunnerSpec` (`lua/code-runner/runner.lua`,
+RUN-001 / ADR-016): `{ id, filetypes, project.markers, tasks }` with no
+function values, no filesystem access and no infrastructure imports. Tasks
+inside a RunnerSpec are `TaskSpec`. Detection criteria are declared
+(marker *names*); detection itself runs in adapters, resolution in the
+Task Resolver, execution in the Execution Engine.
+
+RunnerSpec refinements (RUN-002 edges, no shape expansion): ids are
+lowercase (unambiguous ordering); `enabled` is TaskSpec's own boolean
+toggle (absent = included, `false` = explicit exclusion, other types are
+validation errors); `condition` is excluded in any type (conditional
+availability is declared via filetypes/markers, runtime conditions belong
+to an explicit resolver phase). Scoring (`resolve.lua`, ADR-017): one
+count per signal category, dot-insensitive language signals, exact marker
+match, score desc / lowercase id asc. Availability (`when`, ADR-018):
+`{ os, tools }` data evaluated against injected availability, conjunction,
+missing data excludes; multi-variant fallback as explicit variant tasks.
+
 ______________________________________________________________________
 
 # 5. Execution Contract
@@ -363,6 +381,14 @@ It must not:
 - write quickfix
 - write diagnostics
 
+Implemented precedence for persisted task identity (`task_resolve.lua`,
+switch de selección): Runner Registry first (with built-in re-seed for
+freshness; built-in wins id collisions, customs keep distinct ids), then
+legacy catalog scan by stable id, then verified test-action reconstruction.
+Reasons are explicit, never silent: `no-catalog-entry`, `task-desconocida`,
+`command-funcion`, `test-no-aplica`. The caller always keeps a fallback to
+the persisted raw command.
+
 ______________________________________________________________________
 
 # 16. Task Registry
@@ -376,11 +402,9 @@ get(task_id)
 list()
 ```
 
-Potential future:
-
-```text
-resolve(context)
-```
+Implemented as `task_registry.lua` (ARCH-006). Candidate resolution over a
+detected context is implemented separately as `resolve.lua` (RUN-002,
+ADR-017): pure, scored, deterministic, explicit empty result.
 
 The registry must preserve Task identity.
 
@@ -396,6 +420,12 @@ unregister(runner_id)
 get(runner_id)
 list()
 ```
+
+Implemented as `runner_registry.lua` (RUN-002, same pattern as §16, keyed
+by stable id). Built-in population via `runners.seed` (pure projection of
+the legacy catalog, deterministic order, idempotent, everything omitted
+accounted for). Productive selection still reads the legacy catalog until
+per-route migration; see BOUNDARIES §16.
 
 Runner registration should be independent from execution.
 

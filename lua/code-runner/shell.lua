@@ -68,6 +68,13 @@ SUBSTITUTIONS["$binRun"] = function()
   return M.bin_run()
 end
 
+-- Sufijo de ejecutable de la plataforma (".exe" en Windows, "" fuera).
+-- Existe para que las declaraciones estáticas (RunnerSpec) no ramifiquen por
+-- plataforma: el adaptador centraliza el conocimiento OS, no el runner.
+SUBSTITUTIONS["$exeSuffix"] = function()
+  return M.EXE_SUFFIX
+end
+
 -- % y tokens $var en una sola pasada; los desconocidos se dejan intactos.
 -- vars permite inyectar valores por token (ej: { ["$testName"] = "TestFoo" }).
 -- key (opcional) se usa para resolver $project con los marcadores del lenguaje.

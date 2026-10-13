@@ -9,7 +9,7 @@ ______________________________________________________________________
 # Current Phase
 
 ```text
-P1 — Execution Core: DONE 2026-10-09 (siguiente: P2 — Runner Architecture)
+P2 — Runner Architecture (RUN-002 cerrado 2026-10-12; siguiente: retirada legacy por rutas)
 ```
 
 ______________________________________________________________________
@@ -25,15 +25,14 @@ ______________________________________________________________________
 # Current Task
 
 ```text
-P1 — Execution Core: DONE (siguiente: P2 Runner Architecture)
+P2 — adaptador texMain extraído con paridad (siguiente: javaFqcn)
 ```
 
-Estado: **P1 DONE 2026-10-09**. Revisión administrativa final (ver TODO.md):
-árbol completo auditado (36 specs registrados, sin ficheros fuera de la
-auditoría), suite 607/0/2 sobre el árbol final, EXEC-009 DONE, 3
-bloqueantes cerrados en slices 7–9 con evidencia. Residuales aceptados y
-splits diferidos anotados sin abrir bloqueantes (init/terminal split,
-B1/B2/C9, events.emit sin pcall). Siguiente prioridad del roadmap: P2.
+Estado: **P1 DONE; P2 en curso**. `context/tex.lua` 2026-10-13: `main_file`
+puro sobre líneas (precedente `context/test.lua`), paridad semántica con
+`detect_main_tex` + forma canónica forward-slash documentada como desvío
+intencional del `:p` con backslashes; 8 tests. `latex.lua` intacto y
+mandando. Suite 690/0/2. Sin cableado, sin commit.
 
 ______________________________________________________________________
 
@@ -260,9 +259,13 @@ Persistent OpenCode documentation is being established.
 
 # Conflicts found during ARCH-001
 
-La implementación actual NO fue modificada. Estos son conflictos observados
-entre la arquitectura actual y las decisiones de `.opencode/`. Se dejan como
-input para las tareas correspondientes.
+Registro histórico de la auditoría inicial (2026-09-01): la implementación
+NO se había modificado entonces. Varios puntos se resolvieron después —
+C5 (Engine único: EXEC-009 slices 1–6), C6 (run_last por task_id: slice 3),
+C2/C3 parcial (tracking + switch, con rama legacy explícita), C7 parcial
+(task_registry + runner_registry conviven con el legacy). Estado vigente de
+cada uno: ver `BOUNDARIES.md` §16 y `TODO.md` (slices). Lo no resuelto
+sigue abajo como fue observado.
 
 ## C1 — Action (label → command) vs TaskSpec (ADR-001/ADR-002)
 
@@ -367,10 +370,11 @@ Application → Execution/Result; unificar `&&` en Core (C9/EXEC-002).
 # Next Tasks
 
 ```text
-EXEC-007
+Retirada legacy por rutas (P2): inventario de closures, migración vertical
+con paridad, retirada por bypass sin consumidores.
 ```
 
-See `TODO.md`.
+See `TODO.md` (P2) for scope; each route gets its own acceptance criteria.
 
 ______________________________________________________________________
 
@@ -402,9 +406,11 @@ ______________________________________________________________________
 
 # Feature Freeze
 
-Until P0 and the first Execution Core milestone are complete:
+P0 and P1 are DONE; the freeze below applied to them and is kept as record.
+For P2, the analogous rule: no new user-facing capabilities until the
+Runner architecture stabilizes (same avoid-list applies while P2 is open).
 
-DO NOT add:
+DO NOT add (record of the P0/P1 freeze):
 
 - new language runners
 - major UI features

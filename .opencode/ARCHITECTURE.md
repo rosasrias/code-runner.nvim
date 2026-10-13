@@ -153,6 +153,13 @@ Runner Registry describes available runners.
 
 Task Registry contains resolved/registered tasks.
 
+Implemented (P2 RUN-001/002): runners are declared as `RunnerSpec`
+(`runner.lua`, ADR-016) and stored in `runner_registry.lua` (CONTRACTS
+§17); candidates are computed by the pure resolver `resolve.lua`
+(ADR-017) without touching the filesystem. The legacy label-keyed catalog
+and `actions/registry.lua` coexist as the productive selection source
+until per-route migration; see BOUNDARIES §16.
+
 ______________________________________________________________________
 
 ## 3.4 Context
@@ -488,6 +495,15 @@ Example:
 
 A Runner MUST NOT own process lifecycle.
 
+Declarative constraints (RUN-001, ADR-016, CONTRACTS §4): a RunnerSpec
+holds only data — `{ id, filetypes, project.markers, tasks }`, ids
+lowercase, no function values anywhere (`command`/`condition`/`enabled` as
+functions are rejected), no filesystem access, no infrastructure imports.
+Tasks inside a RunnerSpec ARE `TaskSpec` (composition, not duplication);
+`enabled` (absent = included, `false` = excluded) is TaskSpec's own toggle.
+Detection criteria are declared (marker *names*); detection runs in
+adapters, resolution in the resolver, execution in the Engine.
+
 ______________________________________________________________________
 
 # 10. Runner Resolution
@@ -523,6 +539,14 @@ available executables
 project configuration
 current file location
 ```
+
+Implemented scoring (RUN-002, ADR-017, `resolve.lua`): filetype/extension
+hit scores 2, project-marker hit scores 1, counted once per category;
+0 = not a candidate. Order is score desc, runner id asc, declared task
+order — same input always yields the same output, independent of
+registration order. No match is an explicit empty candidate list (never
+nil or an error). Tool availability is intentionally not an input yet
+(would require extending RunnerSpec: separate decision).
 
 ______________________________________________________________________
 
