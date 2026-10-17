@@ -374,6 +374,27 @@ end)
     clean_windows()
   end)
 
+  T.it("con transparencia de base46 el fondo queda en NONE", function()
+    vim.cmd "only"
+
+    -- Simula la opcion de transparencia de NvChad/base46.
+    local prev = package.loaded["nvconfig"]
+    package.loaded["nvconfig"] = { base46 = { transparency = true } }
+
+    terminal._open_window "horizontal"
+
+    local ok, bg_hl = pcall(vim.api.nvim_get_hl, 0, { name = "CodeRunnerTermBg" })
+
+    -- Restaurar el stub antes de asertar (un assert fallido aborta el test).
+    package.loaded["nvconfig"] = prev
+
+    T.truthy(ok, "grupo de fondo consultado")
+    T.eq(nil, bg_hl.bg, "sin bg: usa el fondo transparente del editor")
+    T.eq(nil, bg_hl.fg, "sin fg: el texto no se toca")
+
+    clean_windows()
+  end)
+
   T.it("exitmsg azul en exito y rojo en error, reemplaza el del core", function()
     local tbuffer = require "code-runner.terminal.buffer"
     local buf = vim.api.nvim_create_buf(false, true)

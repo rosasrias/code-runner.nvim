@@ -77,7 +77,7 @@ Con [lazy.nvim](https://github.com/folke/lazy.nvim):
       hl_title = "ExBlue", -- color del título (grupos "Ex*" del tema ecotic)
       hl_status_ok = "ExGreen", -- estado "✓ terminó OK · q cierra"
       hl_status_err = "ExYellow", -- estado "✗ error N · q cierra"
-      winhighlight = "Normal:CodeRunnerTermBg,...", -- bg darker_black del tema = NvimTree/volt (texto intacto); "" = Normal
+      winhighlight = "Normal:CodeRunnerTermBg,...", -- bg darker_black del tema = NvimTree/volt (texto intacto); "" = Normal; con transparencia (base46) = NONE
       autoclose = false, -- false: queda abierta al terminar, cierra con q; true: se cierra sola si termina OK
     },
     autosave = true,
@@ -172,6 +172,12 @@ M.override = {
   CodeRunnerTermErr    = { fg = "#f7768e" },
 }
 ```
+
+### Transparencia
+
+Con transparencia activa (NvChad/base46, `base46.transparency = true`) el fondo
+de la ventana de la terminal va a `NONE`: en vez del bg oscuro propio, deja ver
+el fondo del editor. El texto no se toca. No hay que configurar nada.
 
 ## Uso
 

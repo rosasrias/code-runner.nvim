@@ -27,6 +27,12 @@ ______________________________________________________________________
 - Added persistent development state.
 - Reorganized roadmap around architectural maturity.
 
+### Terminal
+
+- El fondo de la ventana de la terminal (`CodeRunnerTermBg`) va a `NONE` cuando
+  la transparencia de base46/NvChad está activa: deja ver el fondo del editor en
+  vez del bg oscuro propio. El texto no se toca.
+
 ______________________________________________________________________
 
 ## Pre-v1.0

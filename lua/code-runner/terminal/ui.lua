@@ -34,6 +34,18 @@ local function theme_dark_bg()
   return nil
 end
 
+-- Si el tema activo usa transparencia (NvChad/base46: la opción vive en
+-- nvconfig.base46.transparency y deja Normal sin bg), la terminal no debe
+-- forzar un bg oscuro propio: tiene que dejar ver el fondo del editor.
+local function theme_transparent()
+  local ok, nvconfig = pcall(require, "nvconfig")
+
+  return ok
+    and type(nvconfig) == "table"
+    and type(nvconfig.base46) == "table"
+    and nvconfig.base46.transparency == true
+end
+
 function M._apply_term_bg(win)
   if not vim.api.nvim_win_is_valid(win) then
     return
@@ -43,14 +55,20 @@ function M._apply_term_bg(win)
     return
   end
   if hl ~= "" then
-    -- Solo el fondo oscuro del tema en un grupo propio sin fg: el texto de
-    -- la terminal (claro) no se toca. Sin bg disponible, el grupo queda
-    -- vacio y la terminal usa su fondo normal.
-    local bg = theme_dark_bg()
-    if bg then
-      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = bg })
+    if theme_transparent() then
+      -- Con transparencia el bg va a NONE (sin fg): la ventana muestra el
+      -- fondo del editor en vez de un bg oscuro propio.
+      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = "NONE" })
     else
-      vim.api.nvim_set_hl(0, "CodeRunnerTermBg", {})
+      -- Solo el fondo oscuro del tema en un grupo propio sin fg: el texto de
+      -- la terminal (claro) no se toca. Sin bg disponible, el grupo queda
+      -- vacio y la terminal usa su fondo normal.
+      local bg = theme_dark_bg()
+      if bg then
+        vim.api.nvim_set_hl(0, "CodeRunnerTermBg", { bg = bg })
+      else
+        vim.api.nvim_set_hl(0, "CodeRunnerTermBg", {})
+      end
     end
   end
   -- "" limpia el heredado del split (los splits heredan winhighlight).
